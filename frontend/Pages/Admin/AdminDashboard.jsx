@@ -8,19 +8,20 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
-  FlatList,
   Dimensions,
   Animated,
   Easing,
   Modal,
   Platform,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import CustomDrawer from '../CustomDrawer'; // Import your CustomDrawer component
+import CustomDrawer from '../CustomDrawer';
+import API_BASE_URL from '../../utils/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,64 +38,67 @@ const AdminDashboard = () => {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   // Data state
-  const [users, setUsers] = useState([]);
-  const [animals, setAnimals] = useState([]);
-  const [tasks, setTasks] = useState([]);
+  const [data, setData] = useState({
+    users: 0,
+    animals: 0,
+    tasks: [],
+    pendingTasks: 0,
+    completedTasks: 0
+  });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Modal states
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [showAnimalModal, setShowAnimalModal] = useState(false);
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-
-  // Navigation state
-  const [activeTab, setActiveTab] = useState('dashboard');
-
-  const sidebarItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'bar-chart-outline' },
-    { id: 'users', label: 'Manage Users', icon: 'people-outline' },
-    { id: 'animals', label: 'Animal Profiles', icon: 'paw-outline' },
-    { id: 'tasks', label: 'Task Management', icon: 'checkmark-circle-outline' },
-    { id: 'schedules', label: 'Schedules', icon: 'calendar-outline' },
-    { id: 'logs', label: 'Health Logs', icon: 'document-text-outline' },
-    { id: 'reports', label: 'Reports', icon: 'download-outline' },
-    { id: 'audit', label: 'Audit Logs', icon: 'shield-outline' },
-  ];
-
-  useEffect(() => {
-    initializeData();
-  }, []);
-
-  const initializeData = async () => {
+  // Fetch data from API
+  const fetchData = async (isRefresh = false) => {
     try {
-      setLoading(true);
-      
-      // Initialize with sample data
-      setUsers([
-        { id: 1, name: 'John Doe', email: 'john@example.com', role: 'Caretaker', status: 'active' },
-        { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'Veterinarian', status: 'active' },
-        { id: 3, name: 'Mike Johnson', email: 'mike@example.com', role: 'Admin', status: 'inactive' },
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const [usersRes, animalsRes, tasksRes, pendingRes, completedRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/user/countUsersOnly`),
+        fetch(`${API_BASE_URL}/animal/count`),
+        fetch(`${API_BASE_URL}/tasks/getAll`),
+        fetch(`${API_BASE_URL}/tasks/count/pending`),
+        fetch(`${API_BASE_URL}/tasks/count/completed`)
       ]);
 
-      setAnimals([
-        { id: 1, name: 'Leo', species: 'Lion', age: 5, health: 'Good', caretaker: 'John Doe' },
-        { id: 2, name: 'Bella', species: 'Elephant', age: 12, health: 'Fair', caretaker: 'Jane Smith' },
-        { id: 3, name: 'Charlie', species: 'Chimpanzee', age: 8, health: 'Excellent', caretaker: 'John Doe' },
-      ]);
+      if (!usersRes.ok || !animalsRes.ok || !tasksRes.ok || !pendingRes.ok || !completedRes.ok) {
+        throw new Error('Failed to fetch data from one or more APIs');
+      }
 
-      setTasks([
-        { id: 1, title: 'Feed Leo', description: 'Morning feeding routine', assignee: 'John Doe', status: 'pending', priority: 'high', dueDate: '2025-01-15' },
-        { id: 2, title: 'Health Check - Bella', description: 'Weekly health examination', assignee: 'Jane Smith', status: 'completed', priority: 'medium', dueDate: '2025-01-14' },
-        { id: 3, title: 'Enclosure Cleaning', description: 'Clean Charlie\'s enclosure', assignee: 'John Doe', status: 'pending', priority: 'low', dueDate: '2025-01-16' },
-      ]);
+      const usersData = await usersRes.json();
+      const animalsData = await animalsRes.json();
+      const tasksData = await tasksRes.json();
+      const pendingData = await pendingRes.json();
+      const completedData = await completedRes.json();
 
-    } catch (error) {
-      console.error('Error initializing data:', error);
+      setData({
+        users: usersData.count,
+        animals: animalsData.count,
+        tasks: tasksData,
+        pendingTasks: pendingData.count,
+        completedTasks: completedData.count
+      });
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+    // Set up polling to refresh data every 30 seconds
+    const interval = setInterval(() => fetchData(true), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Drawer animations
   const openDrawer = () => {
@@ -132,203 +136,16 @@ const AdminDashboard = () => {
     ]).start(() => setDrawerVisible(false));
   };
 
-  // Stats calculations
-  const getStats = () => {
-    const totalUsers = users.length;
-    const totalAnimals = animals.length;
-    const totalTasks = tasks.length;
-    const pendingTasks = tasks.filter(task => task.status === 'pending').length;
-    const completedTasks = tasks.filter(task => task.status === 'completed').length;
-    const activeUsers = users.filter(user => user.status === 'active').length;
-
-    return {
-      totalUsers,
-      totalAnimals,
-      totalTasks,
-      pendingTasks,
-      completedTasks,
-      activeUsers,
-    };
+  const handleRefresh = () => {
+    fetchData(true);
   };
 
-  const stats = getStats();
-
-  // Render functions
-  const renderStatsCard = (title, value, icon, color) => (
-    <View style={[styles.statsCard, { borderLeftColor: color }]}>
-      <View style={styles.statsContent}>
-        <View style={styles.statsInfo}>
-          <Text style={styles.statsTitle}>{title}</Text>
-          <Text style={[styles.statsValue, { color }]}>{value}</Text>
-        </View>
-        <View style={[styles.statsIcon, { backgroundColor: color + '20' }]}>
-          <Ionicons name={icon} size={24} color={color} />
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderDashboard = () => (
-    <View style={styles.dashboardContainer}>
-      <Text style={styles.sectionTitle}>Dashboard Overview</Text>
-      
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        {renderStatsCard('Total Users', stats.totalUsers, 'people-outline', '#3182ce')}
-        {renderStatsCard('Total Animals', stats.totalAnimals, 'paw-outline', '#38a169')}
-        {renderStatsCard('Total Tasks', stats.totalTasks, 'checkmark-circle-outline', '#805ad5')}
-        {renderStatsCard('Pending Tasks', stats.pendingTasks, 'time-outline', '#e53e3e')}
-      </View>
-
-      {/* Recent Activity */}
-      <View style={styles.recentActivity}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <View style={styles.activityList}>
-          <View style={styles.activityItem}>
-            <Ionicons name="checkmark-circle" size={20} color="#38a169" />
-            <Text style={styles.activityText}>Task "Health Check - Bella" completed</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <Ionicons name="person-add" size={20} color="#3182ce" />
-            <Text style={styles.activityText}>New user "Mike Johnson" added</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <Ionicons name="paw" size={20} color="#38a169" />
-            <Text style={styles.activityText}>Animal "Charlie" profile updated</Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderUserManagement = () => (
-    <View style={styles.listContainer}>
-      <View style={styles.listHeader}>
-        <Text style={styles.sectionTitle}>User Management</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowUserModal(true)}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add User</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.listItem}>
-            <View style={styles.listItemContent}>
-              <Text style={styles.listItemTitle}>{item.name}</Text>
-              <Text style={styles.listItemSubtitle}>{item.email}</Text>
-              <Text style={styles.listItemMeta}>Role: {item.role}</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: item.status === 'active' ? '#48bb78' : '#ed8936' }]}>
-              <Text style={styles.statusText}>{item.status}</Text>
-            </View>
-          </View>
-        )}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
-
-  const renderAnimalProfiles = () => (
-    <View style={styles.listContainer}>
-      <View style={styles.listHeader}>
-        <Text style={styles.sectionTitle}>Animal Profiles</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowAnimalModal(true)}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add Animal</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <FlatList
-        data={animals}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.listItem}>
-            <View style={styles.listItemContent}>
-              <Text style={styles.listItemTitle}>{item.name}</Text>
-              <Text style={styles.listItemSubtitle}>{item.species} • Age: {item.age}</Text>
-              <Text style={styles.listItemMeta}>Caretaker: {item.caretaker}</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: item.health === 'Excellent' ? '#48bb78' : item.health === 'Good' ? '#38a169' : '#ed8936' }]}>
-              <Text style={styles.statusText}>{item.health}</Text>
-            </View>
-          </View>
-        )}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
-
-  const renderTaskManagement = () => (
-    <View style={styles.listContainer}>
-      <View style={styles.listHeader}>
-        <Text style={styles.sectionTitle}>Task Management</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowTaskModal(true)}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add Task</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <FlatList
-        data={tasks}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.listItem}>
-            <View style={styles.listItemContent}>
-              <Text style={styles.listItemTitle}>{item.title}</Text>
-              <Text style={styles.listItemSubtitle}>{item.description}</Text>
-              <Text style={styles.listItemMeta}>Assigned to: {item.assignee} • Priority: {item.priority}</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: item.status === 'completed' ? '#48bb78' : '#ed8936' }]}>
-              <Text style={styles.statusText}>{item.status}</Text>
-            </View>
-          </View>
-        )}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
-
-  const renderComingSoon = (feature) => (
-    <View style={styles.comingSoon}>
-      <Ionicons name="construct-outline" size={64} color="#a0aec0" />
-      <Text style={styles.comingSoonText}>{feature} coming soon...</Text>
-      <Text style={styles.comingSoonSubtext}>This feature is currently under development</Text>
-    </View>
-  );
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return renderDashboard();
-      case 'users':
-        return renderUserManagement();
-      case 'animals':
-        return renderAnimalProfiles();
-      case 'tasks':
-        return renderTaskManagement();
-      case 'schedules':
-        return renderComingSoon('Schedules');
-      case 'logs':
-        return renderComingSoon('Health Logs');
-      case 'reports':
-        return renderComingSoon('Reports');
-      case 'audit':
-        return renderComingSoon('Audit Logs');
-      default:
-        return renderDashboard();
-    }
+  const handleExportReport = () => {
+    Alert.alert(
+      'Export Report',
+      'Export functionality will be implemented soon.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleLogout = async () => {
@@ -353,11 +170,159 @@ const AdminDashboard = () => {
     );
   };
 
-  if (loading) {
+  // Render functions
+  const renderStatsCard = (title, value, icon, color, trend, loading) => (
+    <View style={[styles.statsCard, { borderLeftColor: color }]}>
+      <View style={styles.statsContent}>
+        <View style={styles.statsInfo}>
+          <Text style={styles.statsTitle}>{title}</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={color} />
+          ) : (
+            <View>
+              <Text style={[styles.statsValue, { color }]}>{value}</Text>
+              {trend && <Text style={styles.statsTrend}>↗ {trend}</Text>}
+            </View>
+          )}
+        </View>
+        <View style={[styles.statsIcon, { backgroundColor: color + '20' }]}>
+          <Ionicons name={icon} size={24} color={color} />
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderDashboard = () => (
+    <View style={styles.dashboardContainer}>
+      {/* Header Actions */}
+      <View style={styles.pageHeader}>
+        <Text style={styles.sectionTitle}>Dashboard Overview</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnSecondary]}
+            onPress={handleRefresh}
+            disabled={loading || refreshing}
+          >
+            <Text style={styles.btnSecondaryText}>
+              {loading || refreshing ? 'Refreshing...' : 'Refresh'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnPrimary]}
+            onPress={handleExportReport}
+          >
+            <Ionicons name="download-outline" size={16} color="white" />
+            <Text style={styles.btnPrimaryText}>Export</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      
+      {/* Stats Grid */}
+      <View style={styles.statsGrid}>
+        {renderStatsCard('Total Users', data.users, 'people-outline', '#3182ce', '+12%', loading)}
+        {renderStatsCard('Total Animals', data.animals, 'paw-outline', '#38a169', '+8%', loading)}
+        {renderStatsCard('Pending Tasks', data.pendingTasks, 'time-outline', '#e53e3e', null, loading)}
+        {renderStatsCard('Completed Tasks', data.completedTasks, 'checkmark-circle-outline', '#805ad5', '+24%', loading)}
+      </View>
+
+      {/* Recent Tasks */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Recent Tasks</Text>
+        </View>
+        <View style={styles.cardContent}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3182ce" />
+              <Text style={styles.loadingText}>Loading tasks...</Text>
+            </View>
+          ) : data.tasks.length === 0 ? (
+            <Text style={styles.noData}>No tasks available</Text>
+          ) : (
+            <View style={styles.taskList}>
+              {data.tasks.slice(0, 5).map((task, index) => (
+                <View key={task.id || index} style={styles.taskItem}>
+                  <View style={styles.taskInfo}>
+                    <Text style={styles.taskTitle}>
+                      {task.type ? task.type.replace('_', ' ') : 'Task'}
+                    </Text>
+                    <Text style={styles.taskDescription}>
+                      {(task.animalId && task.animalId.name) || 'Unknown Animal'} -{' '}
+                      {(task.assignedTo && task.assignedTo.name) || 'Unassigned'}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.badge,
+                      task.status === 'completed' ? styles.badgeGreen : styles.badgeOrange
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        task.status === 'completed' ? styles.badgeTextGreen : styles.badgeTextOrange
+                      ]}
+                    >
+                      {task.status || 'pending'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* System Activity */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>System Activity</Text>
+        </View>
+        <View style={styles.cardContent}>
+          <View style={styles.activityList}>
+            <View style={styles.activityItem}>
+              <View style={[styles.activityIndicator, styles.activityIndicatorGreen]} />
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>Data refreshed successfully</Text>
+                <Text style={styles.activityTime}>
+                  {loading || refreshing ? 'Refreshing...' : 'Just now'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.activityItem}>
+              <View style={[styles.activityIndicator, styles.activityIndicatorBlue]} />
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>Dashboard loaded</Text>
+                <Text style={styles.activityTime}>Connected to API</Text>
+              </View>
+            </View>
+            <View style={styles.activityItem}>
+              <View style={[styles.activityIndicator, styles.activityIndicatorOrange]} />
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>Auto-refresh enabled</Text>
+                <Text style={styles.activityTime}>Every 30 seconds</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  if (error) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#315342" />
-        <Text style={styles.loadingText}>Loading Admin Dashboard...</Text>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#315342" />
+        <View style={styles.errorContainer}>
+          <View style={styles.errorCard}>
+            <Ionicons name="alert-circle-outline" size={48} color="#e53e3e" />
+            <Text style={styles.errorTitle}>Unable to load dashboard</Text>
+            <Text style={styles.errorMessage}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => fetchData()}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
@@ -390,43 +355,19 @@ const AdminDashboard = () => {
         </View>
       </LinearGradient>
 
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabScrollView}
-        >
-          {sidebarItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.tabItem,
-                activeTab === item.id && styles.activeTabItem
-              ]}
-              onPress={() => setActiveTab(item.id)}
-            >
-              <Ionicons
-                name={item.icon}
-                size={20}
-                color={activeTab === item.id ? '#315342' : '#a0aec0'}
-              />
-              <Text
-                style={[
-                  styles.tabLabel,
-                  activeTab === item.id && styles.activeTabLabel
-                ]}
-              >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
       {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderContent()}
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#315342']}
+          />
+        }
+      >
+        {renderDashboard()}
       </ScrollView>
 
       {/* Custom Drawer */}
@@ -447,115 +388,153 @@ const AdminDashboard = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#315342',
+    color: '#64748b',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorCard: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#315342',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
   header: {
     paddingBottom: 30,
-    paddingTop: getStatusBarHeight(),
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+       paddingTop: getStatusBarHeight(),
+       borderBottomLeftRadius: 30,
+       borderBottomRightRadius: 30,
+       backgroundColor: '#315342',
   },
   headerContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 10,
+    marginBottom: 15,
   },
   headerButton: {
     padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(164, 217, 171, 0.2)',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#ffffff',
     marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  tabContainer: {
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  tabScrollView: {
-    paddingHorizontal: 20,
-  },
-  tabItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    borderRadius: 20,
-    backgroundColor: '#f7fafc',
-  },
-  activeTabItem: {
-    backgroundColor: '#e6fffa',
-  },
-  tabLabel: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#a0aec0',
-    fontWeight: '500',
-  },
-  activeTabLabel: {
-    color: '#315342',
-    fontWeight: '600',
+    color: '#a4d9ab',
   },
   content: {
     flex: 1,
-    padding: 20,
   },
   dashboardContainer: {
-    flex: 1,
+    padding: 20,
+  },
+  pageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#315342',
-    marginBottom: 16,
+    color: '#1e293b',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  btn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  btnPrimary: {
+    backgroundColor: '#315342',
+  },
+  btnSecondary: {
+    backgroundColor: '#e2e8f0',
+  },
+  btnPrimaryText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  btnSecondaryText: {
+    color: '#475569',
+    fontWeight: '600',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 30,
+    gap: 15,
+    marginBottom: 20,
   },
   statsCard: {
-    width: (width - 60) / 2,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: 20,
+    flex: 1,
+    minWidth: '45%',
     borderLeftWidth: 4,
-    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
+    elevation: 2,
   },
   statsContent: {
     flexDirection: 'row',
@@ -567,148 +546,154 @@ const styles = StyleSheet.create({
   },
   statsTitle: {
     fontSize: 14,
-    color: '#718096',
-    marginBottom: 4,
+    color: '#64748b',
+    marginBottom: 8,
   },
   statsValue: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statsTrend: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '600',
   },
   statsIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  recentActivity: {
-    marginTop: 20,
-  },
-  activityList: {
-    backgroundColor: '#ffffff',
+  card: {
+    backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    elevation: 2,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
+    elevation: 2,
   },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
+  cardHeader: {
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#e2e8f0',
   },
-  activityText: {
-    marginLeft: 12,
-    fontSize: 14,
-    color: '#4a5568',
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
   },
-  listContainer: {
-    flex: 1,
+  cardContent: {
+    padding: 20,
   },
-  listHeader: {
+  taskList: {
+    gap: 15,
+  },
+  taskItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#315342',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  addButtonText: {
-    color: '#fff',
-    marginLeft: 4,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  listItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  listItemContent: {
+  taskInfo: {
     flex: 1,
   },
-  listItemTitle: {
+  taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#315342',
+    color: '#1e293b',
     marginBottom: 4,
+    textTransform: 'capitalize',
   },
-  listItemSubtitle: {
+  taskDescription: {
     fontSize: 14,
-    color: '#718096',
-    marginBottom: 2,
+    color: '#64748b',
   },
-  listItemMeta: {
-    fontSize: 12,
-    color: '#a0aec0',
-  },
-  statusBadge: {
+  badge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  statusText: {
+  badgeGreen: {
+    backgroundColor: '#dcfce7',
+  },
+  badgeOrange: {
+    backgroundColor: '#fed7aa',
+  },
+  badgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#ffffff',
+    textTransform: 'capitalize',
   },
-  comingSoon: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
+  badgeTextGreen: {
+    color: '#166534',
   },
-  comingSoonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#718096',
+  badgeTextOrange: {
+    color: '#ea580c',
+  },
+  noData: {
     textAlign: 'center',
-    marginTop: 16,
-  },
-  comingSoonSubtext: {
+    color: '#64748b',
     fontSize: 14,
-    color: '#a0aec0',
-    textAlign: 'center',
-    marginTop: 8,
+    paddingVertical: 20,
+  },
+  activityList: {
+    gap: 15,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  activityIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  activityIndicatorGreen: {
+    backgroundColor: '#10b981',
+  },
+  activityIndicatorBlue: {
+    backgroundColor: '#3b82f6',
+  },
+  activityIndicatorOrange: {
+    backgroundColor: '#f97316',
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  activityTime: {
+    fontSize: 12,
+    color: '#64748b',
   },
   modalContainer: {
     flex: 1,
-    flexDirection: 'row',
-  },
-  drawerContainer: {
-    width: width * 0.8,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
   },
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  drawerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: width * 0.8,
   },
 });
 

@@ -5,51 +5,51 @@ const Task = require('../models/Task');
 // ================================
 // CREATE task
 // ================================
-// router.post('/add', async (req, res) => {
-//   try {
-//     const {
-//       type,
-//       assignedTo,
-//       animalId,
-//       scheduleDate,
-//       scheduleTimes,
-//       isRecurring,
-//       recurrencePattern,
-//       endDate,
-//       status
-//     } = req.body;
+router.post('/add', async (req, res) => {
+  try {
+    const {
+      type,
+      assignedTo,
+      animalId,
+      scheduleDate,
+      scheduleTimes,
+      isRecurring,
+      recurrencePattern,
+      endDate,
+      status
+    } = req.body;
 
-//     // Validate required fields for recurring tasks
-//     if (isRecurring) {
-//       if (!scheduleDate) {
-//         return res.status(400).json({ error: 'Recurring tasks require a start date (scheduleDate).' });
-//       }
-//       if (!recurrencePattern || !endDate) {
-//         return res.status(400).json({ error: 'Recurring tasks require recurrencePattern and endDate.' });
-//       }
-//       if (new Date(endDate) <= new Date(scheduleDate)) {
-//         return res.status(400).json({ error: 'End date must be after the start date.' });
-//       }
-//     }
+    // Validate required fields for recurring tasks
+    if (isRecurring) {
+      if (!scheduleDate) {
+        return res.status(400).json({ error: 'Recurring tasks require a start date (scheduleDate).' });
+      }
+      if (!recurrencePattern || !endDate) {
+        return res.status(400).json({ error: 'Recurring tasks require recurrencePattern and endDate.' });
+      }
+      if (new Date(endDate) <= new Date(scheduleDate)) {
+        return res.status(400).json({ error: 'End date must be after the start date.' });
+      }
+    }
 
-//     const task = new Task({
-//       type,
-//       assignedTo,
-//       animalId,
-//       scheduleDate: scheduleDate || null,
-//       scheduleTimes,
-//       isRecurring,
-//       recurrencePattern,
-//       endDate,
-//       status: status || 'Pending'
-//     });
+    const task = new Task({
+      type,
+      assignedTo,
+      animalId,
+      scheduleDate: scheduleDate || null,
+      scheduleTimes,
+      isRecurring,
+      recurrencePattern,
+      endDate,
+      status: status || 'Pending'
+    });
 
-//     await task.save();
-//     res.status(201).json(task);
-//   } catch (error) {
-//     res.status(400).json({ error: error.message });
-//   }
-// });
+    await task.save();
+    res.status(201).json(task);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 // ================================
 // GET all tasks (detailed view)
@@ -77,7 +77,7 @@ router.get('/getTask', async (req, res) => {
     const calendarEvents = [];
 
     tasks.forEach(task => {
-      //  Skip completed tasks
+      // 🚫 Skip completed tasks
       if (task.status === 'Completed') return;
 
       const animal = task.animalId || {};
@@ -157,8 +157,6 @@ router.get('/user/:userId', async (req, res) => {
   }
 });
 
-
-
 // ================================
 // UPDATE a task
 // ================================
@@ -213,66 +211,17 @@ router.put('/edit/:id', async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-// Update only the status of a task
-router.put('/status/:id', async (req, res) => {
-  try {
-    const { status } = req.body;
-
-    // Validate input
-    if (!['Pending', 'Completed'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status value' });
-    }
-
-    const update = {
-      status,
-      completedAt: status === 'Completed' ? new Date() : null
-    };
-
-    const updatedTask = await Task.findByIdAndUpdate(
-      req.params.id,
-      update,
-      { new: true }
-    );
-
-    if (!updatedTask) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Task status updated successfully',
-      task: updatedTask
-    });
-
-  } catch (error) {
-    console.error('Error updating task status:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-module.exports = router;
-
-
-
 // ================================
 // DELETE a task
 // ================================
-// router.delete('/delete/:id', async (req, res) => {
-//   try {
-//     await Task.findByIdAndDelete(req.params.id);
-//     res.json({ message: 'Task deleted successfully' });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-
+router.delete('/delete/:id', async (req, res) => {
+  try {
+    await Task.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Task deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Count pending tasks
 router.get('/count/pending', async (req, res) => {
@@ -283,8 +232,6 @@ router.get('/count/pending', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-
 
 // Count completed tasks
 router.get('/count/completed', async (req, res) => {

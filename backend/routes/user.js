@@ -55,6 +55,18 @@ router.get('/profile', authenticate, async (req, res) => {
             res.status(500).json({ success: false, message: 'Internal server error' });
         }
     });
+
+
+
+    router.get('/countUsersOnly', async (req, res) => {
+  try {
+    const count = await User.countDocuments({ userType: 'user' });
+    res.status(200).json({ success: true, count });
+  } catch (error) {
+    console.error('Error counting user-type users:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
 // GET all users with their assigned tasks ************
 
 // router.get('/tasks/all', async (req, res) => {

@@ -14,6 +14,7 @@ import {
   StatusBar,
   Animated,
   Easing,
+    Platform,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Feather';
@@ -23,8 +24,12 @@ import API_BASE_URL from '../../utils/api';
 import CustomDrawer from '../CustomDrawer'; // Import your CustomDrawer component
 
 const { width, height } = Dimensions.get('window');
-
+const getStatusBarHeight = () => {
+      return Platform.OS === 'ios' ? (height >= 812 ? 44 : 20) : StatusBar.currentHeight || 24;
+    };
 const AnimalProfiles = ({ setShowAnimalModal }) => {
+
+    
   const navigation = useNavigation();
   
   const [animals, setAnimals] = useState([]);
@@ -583,9 +588,11 @@ const styles = StyleSheet.create({
     color: '#315342',
   },
   header: {
-    backgroundColor: '#315342',
-    paddingBottom: 20,
-    paddingTop: 50,
+     paddingBottom: 30,
+        paddingTop: getStatusBarHeight(),
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        backgroundColor: '#315342',
   },
   headerContent: {
     paddingHorizontal: 20,
