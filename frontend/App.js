@@ -14,6 +14,7 @@ import ViewAnimalProfile from './Pages/AnimalProf/viewAnimalProfile';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import UserManagement from './Pages/Admin/UserManagement';
 import AnimalProfiles from './Pages/Admin/AnimalProfiles';
+import TaskManagement from './Pages/Admin/TaskManagement';
 
 const Stack = createStackNavigator();
 
@@ -76,6 +77,11 @@ export default function App() {
           <Stack.Screen
             name="AnimalProfiles" // 🔗 route must match the drawer item
             component={AnimalProfiles}
+            options={{ headerShown: false }}
+          />
+           <Stack.Screen
+            name="TaskManagement" // 🔗 route must match the drawer item
+            component={TaskManagement}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

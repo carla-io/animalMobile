@@ -96,5 +96,15 @@ router.get('/profile', authenticate, async (req, res) => {
 //   }
 // });
 
+router.get('/getAllUsersOnly', async (req, res) => {
+  try {
+    const users = await User.find({ userType: 'user' }, '-password');
+    res.status(200).json({ success: true, users });
+  } catch (error) {
+    console.error('Error fetching user-type users:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 
 module.exports = router;
