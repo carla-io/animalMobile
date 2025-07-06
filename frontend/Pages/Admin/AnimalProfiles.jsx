@@ -14,27 +14,27 @@ import {
   StatusBar,
   Animated,
   Easing,
-    Platform,
+  Platform,
 } from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import API_BASE_URL from '../../utils/api';
-import CustomDrawer from '../CustomDrawer'; // Import your CustomDrawer component
+import CustomDrawer from '../CustomDrawer';
 
 const { width, height } = Dimensions.get('window');
 const getStatusBarHeight = () => {
-      return Platform.OS === 'ios' ? (height >= 812 ? 44 : 20) : StatusBar.currentHeight || 24;
-    };
-const AnimalProfiles = ({ setShowAnimalModal }) => {
+  return Platform.OS === 'ios' ? (height >= 812 ? 44 : 20) : StatusBar.currentHeight || 24;
+};
 
-    
+const AnimalProfiles = ({ setShowAnimalModal }) => {
   const navigation = useNavigation();
   
   const [animals, setAnimals] = useState([]);
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [imageLoading, setImageLoading] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-width * 0.8)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -106,29 +106,112 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
     }
   };
 
-  const handlePhotoChange = (isEdit = false) => {
-    const options = {
-      mediaType: 'photo',
-      includeBase64: false,
-      maxHeight: 2000,
-      maxWidth: 2000,
-    };
-
-    launchImageLibrary(options, (response) => {
-      if (response.didCancel || response.error) {
-        return;
-      }
-
-      if (response.assets && response.assets[0]) {
-        const asset = response.assets[0];
-        setPhotos(prev => ({
-          ...prev,
-          [isEdit ? 'editFile' : 'newFile']: asset,
-          [isEdit ? 'editPreview' : 'newPreview']: asset.uri
-        }));
-      }
-    });
+  const handlePhotoChange = async (isEdit = false) => {
+    Alert.alert(
+      'Select Photo',
+      'Choose an option',
+      [
+        { text: '📷 Take a Picture', onPress: () => captureImage(isEdit) },
+        { text: '🖼️ Choose from Gallery', onPress: () => pickImage(isEdit) },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
+
+ const pickImage = async (isEdit = false) => {
+  try {
+    setImageLoading(true);
+    
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'You need to allow access to your photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+      allowsMultipleSelection: false,
+    });
+
+    if (!result.canceled && result.assets?.length > 0) {
+      const asset = result.assets[0];
+      
+      // Get file extension from URI
+      const uriParts = asset.uri.split('.');
+      const fileExtension = uriParts[uriParts.length - 1];
+      
+      // Determine MIME type
+      let mimeType = 'image/jpeg';
+      if (fileExtension.toLowerCase() === 'png') {
+        mimeType = 'image/png';
+      } else if (fileExtension.toLowerCase() === 'jpg' || fileExtension.toLowerCase() === 'jpeg') {
+        mimeType = 'image/jpeg';
+      }
+      
+      setPhotos(prev => ({
+        ...prev,
+        [isEdit ? 'editFile' : 'newFile']: {
+          uri: asset.uri,
+          type: mimeType,
+          name: `photo_${Date.now()}.${fileExtension}`,
+          size: asset.fileSize
+        },
+        [isEdit ? 'editPreview' : 'newPreview']: asset.uri
+      }));
+      
+      console.log('Image selected successfully:', asset.uri);
+    }
+  } catch (error) {
+    console.error('Error picking image:', error);
+    Alert.alert('Error', 'Failed to select image');
+  } finally {
+    setImageLoading(false);
+  }
+};
+
+const captureImage = async (isEdit = false) => {
+  try {
+    setImageLoading(true);
+    
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'You need to allow camera access.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets?.length > 0) {
+      const asset = result.assets[0];
+      
+      setPhotos(prev => ({
+        ...prev,
+        [isEdit ? 'editFile' : 'newFile']: {
+          uri: asset.uri,
+          type: 'image/jpeg', // Camera captures are typically JPEG
+          name: `photo_${Date.now()}.jpg`,
+          size: asset.fileSize
+        },
+        [isEdit ? 'editPreview' : 'newPreview']: asset.uri
+      }));
+      
+      console.log('Image captured successfully:', asset.uri);
+    }
+  } catch (error) {
+    console.error('Error capturing image:', error);
+    Alert.alert('Error', 'Failed to capture image');
+  } finally {
+    setImageLoading(false);
+  }
+};
 
   const removePhoto = (isEdit = false) => {
     setPhotos(prev => ({
@@ -171,49 +254,115 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
     }
   };
 
-  const submitForm = async (isEdit = false) => {
-    try {
-      const formData = new FormData();
-      const data = isEdit ? editAnimal : newAnimal;
-      
-      Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, value || '');
-      });
-
-      const photoFile = isEdit ? photos.editFile : photos.newFile;
-      if (photoFile) {
-        formData.append('photo', {
-          uri: photoFile.uri,
-          type: photoFile.type,
-          name: photoFile.fileName || 'photo.jpg',
-        });
-      }
-
-      const url = isEdit 
-        ? `${API_BASE_URL}/animal/update/${editAnimal._id}`
-        : `${API_BASE_URL}/animal/add`;
-      
-      const response = await axios[isEdit ? 'put' : 'post'](url, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      if (response.data.success) {
-        if (isEdit) {
-          setAnimals(prev => prev.map(animal => 
-            animal._id === editAnimal._id ? response.data.animal : animal
-          ));
-          Alert.alert('Success', `${editAnimal.name} updated successfully!`);
-        } else {
-          setAnimals(prev => [...prev, response.data.animal]);
-          Alert.alert('Success', `${newAnimal.name} added successfully!`);
-        }
-        closeModal();
-      }
-    } catch (error) {
-      Alert.alert('Error', `Failed to ${isEdit ? 'update' : 'add'} animal`);
-      console.error('Error:', error);
+ const submitForm = async (isEdit = false) => {
+  try {
+    setLoading(true);
+    const formData = new FormData();
+    const data = isEdit ? editAnimal : newAnimal;
+    
+    // Validate required fields
+    if (!data.name || !data.species) {
+      Alert.alert('Error', 'Name and species are required fields');
+      setLoading(false);
+      return;
     }
-  };
+    
+    // Add text fields to FormData
+    Object.entries(data).forEach(([key, value]) => {
+      if (key !== 'photo' && key !== '_id') {
+        formData.append(key, value || '');
+      }
+    });
+
+    // Add photo if exists - This is the key part for Cloudinary
+    const photoFile = isEdit ? photos.editFile : photos.newFile;
+    if (photoFile && photoFile.uri) {
+      console.log('Adding photo to FormData:', photoFile);
+      
+      // For React Native with Cloudinary, we need to format the file object correctly
+      formData.append('photo', {
+        uri: photoFile.uri,
+        type: photoFile.type,
+        name: photoFile.name,
+      });
+    }
+
+    const url = isEdit 
+      ? `${API_BASE_URL}/animal/update/${editAnimal._id}`
+      : `${API_BASE_URL}/animal/add`;
+    
+    console.log('Submitting to:', url);
+    console.log('Request data:', {
+      method: isEdit ? 'PUT' : 'POST',
+      hasPhoto: !!photoFile,
+      photoInfo: photoFile ? {
+        name: photoFile.name,
+        type: photoFile.type,
+        size: photoFile.size
+      } : null
+    });
+    
+    // Use fetch instead of axios for better FormData support in React Native
+    const response = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
+
+    const responseText = await response.text();
+    console.log('Raw response:', responseText);
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Response text:', responseText);
+      throw new Error('Invalid response format from server');
+    }
+
+    if (response.ok && result.success) {
+      if (isEdit) {
+        setAnimals(prev => prev.map(animal => 
+          animal._id === editAnimal._id ? result.animal : animal
+        ));
+        Alert.alert('Success', `${editAnimal.name} updated successfully!`);
+      } else {
+        setAnimals(prev => [...prev, result.animal]);
+        Alert.alert('Success', `${newAnimal.name} added successfully!`);
+      }
+      closeModal();
+    } else {
+      const errorMsg = result.message || `Server returned ${response.status}: ${response.statusText}`;
+      Alert.alert('Error', errorMsg);
+    }
+  } catch (error) {
+    console.error('Submit error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
+    
+    let errorMessage = 'An error occurred';
+    
+    if (error.message.includes('Network request failed')) {
+      errorMessage = 'Network error: Unable to connect to server. Please check your internet connection and server status.';
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'Request timeout: The server took too long to respond.';
+    } else {
+      errorMessage = error.message || 'An unexpected error occurred';
+    }
+    
+    Alert.alert('Error', `Failed to ${isEdit ? 'update' : 'add'} animal:\n${errorMessage}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const renderPhotoSection = (isEdit = false) => {
     const preview = isEdit ? photos.editPreview : photos.newPreview;
@@ -235,9 +384,16 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
           <TouchableOpacity 
             style={styles.photoUploadArea}
             onPress={() => handlePhotoChange(isEdit)}
+            disabled={imageLoading}
           >
-            <Icon name="upload" size={24} color="#718096" />
-            <Text style={styles.photoUploadText}>Upload Photo</Text>
+            {imageLoading ? (
+              <ActivityIndicator size="small" color="#718096" />
+            ) : (
+              <Icon name="upload" size={24} color="#718096" />
+            )}
+            <Text style={styles.photoUploadText}>
+              {imageLoading ? 'Loading...' : 'Upload Photo'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -251,6 +407,7 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
         <View key={field} style={styles.formField}>
           <Text style={styles.formLabel}>
             {field.charAt(0).toUpperCase() + field.slice(1)}
+            {(field === 'name' || field === 'species') && <Text style={styles.required}> *</Text>}
           </Text>
           <TextInput
             style={styles.formInput}
@@ -336,71 +493,79 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
 
       {/* Animals List */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {animals.map(animal => (
-          <View key={animal._id} style={styles.animalCard}>
-            <View style={styles.animalPhotoContainer}>
-              {animal.photo ? (
-                <Image source={{ uri: animal.photo }} style={styles.animalPhoto} />
-              ) : (
-                <View style={styles.animalPhotoPlaceholder}>
-                  <Icon name="camera" size={32} color="#a0aec0" />
-                  <Text style={styles.photoPlaceholderText}>No Photo</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.animalInfo}>
-              <View style={styles.animalHeader}>
-                <Text style={styles.animalName}>{animal.name}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: animal.status === 'healthy' ? '#48bb78' : '#ed8936' }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {animal.status?.replace('_', ' ') || 'N/A'}
-                  </Text>
-                </View>
+        {animals.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Icon name="camera" size={64} color="#a0aec0" />
+            <Text style={styles.emptyStateText}>No animals yet</Text>
+            <Text style={styles.emptyStateSubtext}>Add your first animal to get started</Text>
+          </View>
+        ) : (
+          animals.map(animal => (
+            <View key={animal._id} style={styles.animalCard}>
+              <View style={styles.animalPhotoContainer}>
+                {animal.photo ? (
+                  <Image source={{ uri: animal.photo }} style={styles.animalPhoto} />
+                ) : (
+                  <View style={styles.animalPhotoPlaceholder}>
+                    <Icon name="camera" size={32} color="#a0aec0" />
+                    <Text style={styles.photoPlaceholderText}>No Photo</Text>
+                  </View>
+                )}
               </View>
 
-              <View style={styles.animalDetails}>
-                {['species', 'breed', 'age', 'owner'].map(field => (
-                  <View key={field} style={styles.animalDetail}>
-                    <Text style={styles.animalDetailLabel}>
-                      {field.charAt(0).toUpperCase() + field.slice(1)}:
-                    </Text>
-                    <Text style={styles.animalDetailValue}>
-                      {animal[field] || 'N/A'}{field === 'age' ? ' years' : ''}
+              <View style={styles.animalInfo}>
+                <View style={styles.animalHeader}>
+                  <Text style={styles.animalName}>{animal.name}</Text>
+                  <View style={[
+                    styles.statusBadge,
+                    { backgroundColor: animal.status === 'healthy' ? '#48bb78' : '#ed8936' }
+                  ]}>
+                    <Text style={styles.statusText}>
+                      {animal.status?.replace('_', ' ') || 'N/A'}
                     </Text>
                   </View>
-                ))}
-              </View>
+                </View>
 
-              <View style={styles.animalActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => openModal('detail', animal)}
-                >
-                  <Icon name="eye" size={16} color="#315342" />
-                  <Text style={styles.actionButtonText}>View</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => openModal('edit', animal)}
-                >
-                  <Icon name="edit-3" size={16} color="#315342" />
-                  <Text style={styles.actionButtonText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => openModal('delete', animal)}
-                >
-                  <Icon name="trash-2" size={16} color="#e53e3e" />
-                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
-                </TouchableOpacity>
+                <View style={styles.animalDetails}>
+                  {['species', 'breed', 'age', 'owner'].map(field => (
+                    <View key={field} style={styles.animalDetail}>
+                      <Text style={styles.animalDetailLabel}>
+                        {field.charAt(0).toUpperCase() + field.slice(1)}:
+                      </Text>
+                      <Text style={styles.animalDetailValue}>
+                        {animal[field] || 'N/A'}{field === 'age' ? ' years' : ''}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.animalActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => openModal('detail', animal)}
+                  >
+                    <Icon name="eye" size={16} color="#315342" />
+                    <Text style={styles.actionButtonText}>View</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => openModal('edit', animal)}
+                  >
+                    <Icon name="edit-3" size={16} color="#315342" />
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.deleteButton]}
+                    onPress={() => openModal('delete', animal)}
+                  >
+                    <Icon name="trash-2" size={16} color="#e53e3e" />
+                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
 
       {/* Detail Modal */}
@@ -479,9 +644,16 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
               <TouchableOpacity 
                 style={styles.btnPrimary} 
                 onPress={() => submitForm(true)}
+                disabled={loading}
               >
-                <Icon name="save" size={16} color="#fff" />
-                <Text style={styles.btnPrimaryText}>Save</Text>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Icon name="save" size={16} color="#fff" />
+                )}
+                <Text style={styles.btnPrimaryText}>
+                  {loading ? 'Saving...' : 'Save'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -510,9 +682,16 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
               <TouchableOpacity 
                 style={styles.btnPrimary} 
                 onPress={() => submitForm(false)}
+                disabled={loading}
               >
-                <Icon name="save" size={16} color="#fff" />
-                <Text style={styles.btnPrimaryText}>Add Animal</Text>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Icon name="save" size={16} color="#fff" />
+                )}
+                <Text style={styles.btnPrimaryText}>
+                  {loading ? 'Adding...' : 'Add Animal'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
