@@ -39,8 +39,8 @@ const CustomDrawer = ({ navigation, onClose }) => {
     { id: '4', title: 'Task Management', icon: 'checkmark-circle-outline', route: 'TaskManagement' },
     { id: '5', title: 'Schedules', icon: 'calendar-outline', route: 'Schedule' },
     { id: '6', title: 'Health Logs', icon: 'document-text-outline', route: 'HealthLogs' },
-    { id: '7', title: 'Reports', icon: 'download-outline', route: 'Reports' },
-    { id: '8', title: 'Audit Logs', icon: 'shield-outline', route: 'AuditLogs' },
+    // { id: '7', title: 'Reports', icon: 'download-outline', route: 'Reports' },
+    // { id: '8', title: 'Audit Logs', icon: 'shield-outline', route: 'AuditLogs' },
   ];
 
   const bottomItems = [

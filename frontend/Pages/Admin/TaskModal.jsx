@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -29,7 +30,7 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showDropdown, setShowDropdown] = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState({ show: false, field: null });
   const [showTimePicker, setShowTimePicker] = useState({ show: false, index: -1 });
 
   const [formData, setFormData] = useState({
@@ -372,7 +373,7 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
     setEditingTask(null);
     setShowTaskModal(false);
     setShowDropdown(null);
-    setShowDatePicker(false);
+    setShowDatePicker({ show: false, field: null });
     setShowTimePicker({ show: false, index: -1 });
     Toast.show({
       type: 'info',
@@ -399,6 +400,7 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  // Fixed CustomDropdown component to remove nested FlatList
   const CustomDropdown = ({ title, value, onValueChange, options, placeholder, fieldKey }) => {
     const isOpen = showDropdown === fieldKey;
     const selectedOption = options.find(opt => (opt.value || opt) === value);
@@ -432,11 +434,14 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
         
         {isOpen && (
           <View style={styles.dropdownList}>
-            <FlatList
-              data={options}
-              keyExtractor={(item, index) => `${fieldKey}-${index}`}
-              renderItem={({ item }) => (
+            <ScrollView
+              style={styles.dropdownScrollView}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+            >
+              {options.map((item, index) => (
                 <TouchableOpacity
+                  key={`${fieldKey}-${index}`}
                   style={[
                     styles.dropdownItem,
                     (item.value || item) === value && styles.dropdownItemSelected
@@ -464,22 +469,21 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
                     <Ionicons name="checkmark" size={18} color="#315342" />
                   )}
                 </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-              style={styles.dropdownFlatList}
-            />
+              ))}
+            </ScrollView>
           </View>
         )}
       </View>
     );
   };
 
-  const DatePickerInput = ({ title, value, onValueChange, placeholder }) => (
+  // Fixed DatePickerInput component
+  const DatePickerInput = ({ title, value, onValueChange, placeholder, fieldKey }) => (
     <View style={styles.formGroup}>
       <Text style={styles.label}>{title}</Text>
       <TouchableOpacity
         style={styles.datePickerButton}
-        onPress={() => setShowDatePicker(true)}
+        onPress={() => setShowDatePicker({ show: true, field: fieldKey })}
       >
         <View style={styles.datePickerContent}>
           <Ionicons name="calendar" size={20} color="#315342" style={styles.dateIcon} />
@@ -508,6 +512,25 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
       </TouchableOpacity>
     </View>
   );
+
+  // Handle date change based on field
+  const handleDateChange = (text) => {
+    if (showDatePicker.field === 'scheduleDate') {
+      setFormData(prev => ({ ...prev, scheduleDate: text }));
+    } else if (showDatePicker.field === 'endDate') {
+      setFormData(prev => ({ ...prev, endDate: text }));
+    }
+  };
+
+  // Get current date value based on field
+  const getCurrentDateValue = () => {
+    if (showDatePicker.field === 'scheduleDate') {
+      return formData.scheduleDate;
+    } else if (showDatePicker.field === 'endDate') {
+      return formData.endDate;
+    }
+    return '';
+  };
 
   if (loading) {
     return (
@@ -607,6 +630,7 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
               value={formData.scheduleDate}
               onValueChange={(value) => setFormData(prev => ({ ...prev, scheduleDate: value }))}
               placeholder="Select date"
+              fieldKey="scheduleDate"
             />
 
             {/* Recurrence Pattern (only if recurring) */}
@@ -627,6 +651,7 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
                   value={formData.endDate}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, endDate: value }))}
                   placeholder="Select end date"
+                  fieldKey="endDate"
                 />
               </>
             )}
@@ -696,25 +721,27 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
         </View>
 
         {/* Date Picker Modal */}
-        <Modal visible={showDatePicker} transparent animationType="fade">
+        <Modal visible={showDatePicker.show} transparent animationType="fade">
           <View style={styles.pickerModalOverlay}>
             <View style={styles.pickerModalContent}>
               <View style={styles.pickerHeader}>
-                <Text style={styles.pickerTitle}>Select Date</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={styles.pickerTitle}>
+                  {showDatePicker.field === 'scheduleDate' ? 'Select Schedule Date' : 'Select End Date'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowDatePicker({ show: false, field: null })}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
               <TextInput
                 style={styles.dateInput}
                 placeholder="YYYY-MM-DD"
-                value={formData.scheduleDate}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, scheduleDate: text }))}
+                value={getCurrentDateValue()}
+                onChangeText={handleDateChange}
                 placeholderTextColor="#999"
               />
               <TouchableOpacity 
                 style={styles.pickerConfirmButton}
-                onPress={() => setShowDatePicker(false)}
+                onPress={() => setShowDatePicker({ show: false, field: null })}
               >
                 <Text style={styles.pickerConfirmText}>Confirm</Text>
               </TouchableOpacity>
@@ -722,7 +749,7 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
           </View>
         </Modal>
 
-        {/* Time Picker Modal */}
+        {/* Time Picker Modal - Fixed to use ScrollView instead of FlatList */}
         <Modal visible={showTimePicker.show} transparent animationType="fade">
           <View style={styles.pickerModalOverlay}>
             <View style={styles.pickerModalContent}>
@@ -732,11 +759,10 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
-              <FlatList
-                data={timeOptions}
-                keyExtractor={(item) => item.value}
-                renderItem={({ item }) => (
+              <ScrollView style={styles.timeOptionsList} showsVerticalScrollIndicator={true}>
+                {timeOptions.map((item) => (
                   <TouchableOpacity
+                    key={item.value}
                     style={styles.timeOption}
                     onPress={() => {
                       handleTimeChange(showTimePicker.index, item.value);
@@ -745,10 +771,8 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
                   >
                     <Text style={styles.timeOptionText}>{formatTime(item.value)}</Text>
                   </TouchableOpacity>
-                )}
-                showsVerticalScrollIndicator={true}
-                style={styles.timeOptionsList}
-              />
+                ))}
+              </ScrollView>
             </View>
           </View>
         </Modal>
