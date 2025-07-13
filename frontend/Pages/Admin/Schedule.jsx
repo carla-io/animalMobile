@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,20 +9,33 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  Modal
+  Modal,
+  Animated,
+  Easing,
+  RefreshControl
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { getStatusBarHeight } from 'react-native-status-bar-height';
 import axios from 'axios';
 import API_BASE_URL from '../../utils/api';
+import CustomDrawer from '../CustomDrawer';
 
 const { width } = Dimensions.get('window');
 
-const AnimalCalendar = () => {
+const AnimalCalendar = ({ navigation }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState([]);
   const [showEventsModal, setShowEventsModal] = useState(false);
+  
+  // Drawer state
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-width * 0.8)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -45,6 +58,58 @@ const AnimalCalendar = () => {
       Alert.alert('Error', 'Failed to fetch calendar tasks');
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchTasks();
+    setRefreshing(false);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: () => navigation.navigate('Login') }
+      ]
+    );
+  };
+
+  const openDrawer = () => {
+    setDrawerVisible(true);
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.bezier(0.25, 0.46, 0.45, 0.94),
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 1,
+        duration: 350,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      })
+    ]).start();
+  };
+
+  const closeDrawer = () => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: -width * 0.8,
+        duration: 300,
+        easing: Easing.bezier(0.55, 0.06, 0.68, 0.19),
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 250,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      })
+    ]).start(() => setDrawerVisible(false));
   };
 
   const getDaysInMonth = (date) => {
@@ -251,53 +316,84 @@ const AnimalCalendar = () => {
   const days = getDaysInMonth(currentDate);
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Animal Task Calendar</Text>
-        <Text style={styles.subtitle}>Manage and track all animal care tasks</Text>
-      </View>
-
-      {/* Calendar Container */}
-      <View style={styles.calendarContainer}>
-        {/* Calendar Header */}
-        <View style={styles.calendarHeader}>
-          <View style={styles.navigationContainer}>
-            <TouchableOpacity style={styles.navButton} onPress={() => navigateMonth(-1)}>
-              <Text style={styles.navButtonText}>←</Text>
+      <LinearGradient
+        colors={['#315342', '#4a7c59']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity onPress={openDrawer} style={styles.headerButton}>
+              <Ionicons name="menu" size={28} color="#a4d9ab" />
             </TouchableOpacity>
-            
-            <Text style={styles.monthTitle}>
-              {months[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </Text>
-            
-            <TouchableOpacity style={styles.navButton} onPress={() => navigateMonth(1)}>
-              <Text style={styles.navButtonText}>→</Text>
+            <View style={styles.headerRight}>
+              <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={styles.headerButton}>
+                <Ionicons name="notifications-outline" size={28} color="#a4d9ab" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
+                <Ionicons name="log-out-outline" size={28} color="#a4d9ab" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <Text style={styles.headerTitle}>Animal Task Calendar</Text>
+          <Text style={styles.headerSubtitle}>Manage and track all animal care tasks</Text>
+        </View>
+      </LinearGradient>
+
+      {/* Content */}
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#315342']}
+          />
+        }
+      >
+        {/* Calendar Container */}
+        <View style={styles.calendarContainer}>
+          {/* Calendar Header */}
+          <View style={styles.calendarHeader}>
+            <View style={styles.navigationContainer}>
+              <TouchableOpacity style={styles.navButton} onPress={() => navigateMonth(-1)}>
+                <Text style={styles.navButtonText}>←</Text>
+              </TouchableOpacity>
+              
+              <Text style={styles.monthTitle}>
+                {months[currentDate.getMonth()]} {currentDate.getFullYear()}
+              </Text>
+              
+              <TouchableOpacity style={styles.navButton} onPress={() => navigateMonth(1)}>
+                <Text style={styles.navButtonText}>→</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Today Button - Moved below header */}
+          <View style={styles.todayButtonContainer}>
+            <TouchableOpacity style={styles.todayButton} onPress={goToToday}>
+              <Text style={styles.todayButtonText}>Go to Today</Text>
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Today Button - Moved below header */}
-        <View style={styles.todayButtonContainer}>
-          <TouchableOpacity style={styles.todayButton} onPress={goToToday}>
-            <Text style={styles.todayButtonText}>Go to Today</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Days of Week Header */}
+          <View style={styles.daysOfWeekContainer}>
+            {daysOfWeek.map((day) => (
+              <View key={day} style={styles.dayOfWeekCell}>
+                <Text style={styles.dayOfWeekText}>{day}</Text>
+              </View>
+            ))}
+          </View>
 
-        {/* Days of Week Header */}
-        <View style={styles.daysOfWeekContainer}>
-          {daysOfWeek.map((day) => (
-            <View key={day} style={styles.dayOfWeekCell}>
-              <Text style={styles.dayOfWeekText}>{day}</Text>
-            </View>
-          ))}
+          {/* Calendar Grid */}
+          <View style={styles.calendarGrid}>
+            {days.map(renderDay)}
+          </View>
         </View>
-
-        {/* Calendar Grid */}
-        <View style={styles.calendarGrid}>
-          {days.map(renderDay)}
-        </View>
-      </View>
+      </ScrollView>
 
       {/* Events Modal */}
       <Modal
@@ -330,7 +426,19 @@ const AnimalCalendar = () => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+
+      {/* Custom Drawer */}
+      <Modal visible={drawerVisible} transparent animationType="none" onRequestClose={closeDrawer}>
+        <View style={styles.modalContainer}>
+          <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={closeDrawer} />
+          </Animated.View>
+          <Animated.View style={[styles.drawerContainer, { transform: [{ translateX: slideAnim }] }]}>
+            <CustomDrawer navigation={navigation} onClose={closeDrawer} />
+          </Animated.View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
@@ -351,18 +459,42 @@ const styles = StyleSheet.create({
     color: '#315342',
   },
   header: {
-    padding: 24,
-    paddingTop: 60,
+    paddingBottom: 30,
+    paddingTop: getStatusBarHeight(),
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    backgroundColor: '#315342',
   },
-  title: {
-    fontSize: 32,
+  headerContent: {
+    paddingHorizontal: 20,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  headerButton: {
+    padding: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#315342',
-    marginBottom: 8,
+    color: '#ffffff',
+    marginBottom: 5,
   },
-  subtitle: {
-    fontSize: 18,
-    color: '#6B7280',
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#a4d9ab',
+  },
+  content: {
+    flex: 1,
+    backgroundColor: '#f8fffe',
+    paddingTop: 20,
   },
   calendarContainer: {
     backgroundColor: 'white',
@@ -643,6 +775,31 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     padding: 40,
+  },
+  
+  // Drawer Styles
+  modalContainer: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  drawerContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: width * 0.8,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });
 
