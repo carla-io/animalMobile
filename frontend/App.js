@@ -15,7 +15,13 @@ import AdminDashboard from './Pages/Admin/AdminDashboard';
 import UserManagement from './Pages/Admin/UserManagement';
 import AnimalProfiles from './Pages/Admin/AnimalProfiles';
 import TaskManagement from './Pages/Admin/TaskManagement';
+import VetDashboard from './Pages/Veterinarian/VetDashboard'; // New import
 import Schedule from './Pages/Admin/Schedule';
+/* import MedicalRecords from './Pages/Veterinarian/MedicalRecords'; // New import
+import AddRecord from './Pages/Veterinarian/AddRecord'; // New import
+import RecordDetail from './Pages/Veterinarian/RecordDetail'; // New import
+import GenerateReport from './Pages/Veterinarian/GenerateReport'; // New import
+import VaccinationSchedule from './Pages/Veterinarian/VaccinationSchedule'; // New import */
 
 const Stack = createStackNavigator();
 
@@ -23,8 +29,8 @@ const theme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#6200ee',
-    secondary: '#03dac6',
+    primary: '#315342', // Updated to match your green theme
+    secondary: '#a4d9ab', // Updated to match your light green
     background: '#f6f6f6',
   },
 };
@@ -35,6 +41,7 @@ export default function App() {
       <NavigationContainer>
         <StatusBar style="auto" />
         <Stack.Navigator initialRouteName="Login">
+          {/* Auth Screens */}
           <Stack.Screen 
             name="Login" 
             component={Login} 
@@ -45,7 +52,9 @@ export default function App() {
             component={Register} 
             options={{ headerShown: false }} 
           />
-            <Stack.Screen 
+          
+          {/* User Screens */}
+          <Stack.Screen 
             name="Home" 
             component={Home} 
             options={{ headerShown: false }} 
@@ -56,38 +65,79 @@ export default function App() {
             options={{ headerShown: false }} 
           />
           <Stack.Screen
-            name="AnimalView" // 🔗 route must match the drawer item
+            name="AnimalView"
             component={ViewAnimalProfile}
             options={{ headerShown: false }}
           />
-           <Stack.Screen
-            name="AdminDashboard" // 🔗 route must match the drawer item
+          
+          {/* Admin Screens */}
+          <Stack.Screen
+            name="AdminDashboard"
             component={AdminDashboard}
             options={{ headerShown: false }}
           />
-           <Stack.Screen
-            name="CustomDrawer" // 🔗 route must match the drawer item
-            component={CustomDrawer}
-            options={{ headerShown: false }}
-          />
           <Stack.Screen
-            name="UserManagement" // 🔗 route must match the drawer item
+            name="UserManagement"
             component={UserManagement}
             options={{ headerShown: false }}
           />
           <Stack.Screen
-            name="AnimalProfiles" // 🔗 route must match the drawer item
+            name="AnimalProfiles"
             component={AnimalProfiles}
             options={{ headerShown: false }}
           />
-           <Stack.Screen
-            name="TaskManagement" // 🔗 route must match the drawer item
+          <Stack.Screen
+            name="TaskManagement"
             component={TaskManagement}
             options={{ headerShown: false }}
           />
-          <Stack.Screen
+            <Stack.Screen
             name="Schedule" // 🔗 route must match the drawer item
             component={Schedule}
+            options={{ headerShown: false }}
+          />
+          
+          {/* Veterinarian Screens */}
+          <Stack.Screen
+            name="VetDashboard"
+            component={VetDashboard}
+            options={{ headerShown: false }}
+          />
+      <Stack.Screen
+  name="AnimalProfile"
+  component={ViewAnimalProfile}
+  options={{ headerShown: false }}
+/>
+       {/*    <Stack.Screen
+            name="MedicalRecords"
+            component={MedicalRecords}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AddRecord"
+            component={AddRecord}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="RecordDetail"
+            component={RecordDetail}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GenerateReport"
+            component={GenerateReport}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="VaccinationSchedule"
+            component={VaccinationSchedule}
+            options={{ headerShown: false }}
+          /> */}
+          
+          {/* Common Components */}
+          <Stack.Screen
+            name="CustomDrawer"
+            component={CustomDrawer}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

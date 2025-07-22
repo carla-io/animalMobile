@@ -31,7 +31,7 @@ const CustomDrawer = ({ navigation, onClose }) => {
     { id: '3', title: 'View Animal', icon: 'paw-outline', route: 'AnimalView' },
   ];
 
-  // Admin menu items (based on your React admin panel)
+  // Admin menu items
   const adminMenuItems = [
     { id: '1', title: 'Dashboard', icon: 'bar-chart-outline', route: 'AdminDashboard' },
     { id: '2', title: 'Manage Users', icon: 'people-outline', route: 'UserManagement' },
@@ -39,8 +39,22 @@ const CustomDrawer = ({ navigation, onClose }) => {
     { id: '4', title: 'Task Management', icon: 'checkmark-circle-outline', route: 'TaskManagement' },
     { id: '5', title: 'Schedules', icon: 'calendar-outline', route: 'Schedule' },
     { id: '6', title: 'Health Logs', icon: 'document-text-outline', route: 'HealthLogs' },
-    // { id: '7', title: 'Reports', icon: 'download-outline', route: 'Reports' },
-    // { id: '8', title: 'Audit Logs', icon: 'shield-outline', route: 'AuditLogs' },
+    { id: '7', title: 'Reports', icon: 'download-outline', route: 'Reports' },
+    { id: '8', title: 'System Settings', icon: 'settings-outline', route: 'SystemSettings' },
+  ];
+
+  // Veterinarian menu items
+  const vetMenuItems = [
+    { id: '1', title: 'Animal Health Dashboard', icon: 'heart-outline', route: 'VetDashboard' },
+    { id: '2', title: 'Animal Profiles', icon: 'paw-outline', route: 'AnimalProfiles' },
+    { id: '3', title: 'Medical Checkups', icon: 'medkit-outline', route: 'MedicalCheckups' },
+    { id: '4', title: 'Treatments & Medications', icon: 'medical-outline', route: 'Treatments' },
+    { id: '5', title: 'Vaccination Records', icon: 'shield-checkmark-outline', route: 'VaccinationRecords' },
+    { id: '6', title: 'Medical History', icon: 'time-outline', route: 'MedicalHistory' },
+    { id: '7', title: 'Health Reports', icon: 'document-text-outline', route: 'HealthReports' },
+    { id: '8', title: 'Emergency Cases', icon: 'warning-outline', route: 'EmergencyCases' },
+    { id: '9', title: 'Search Medical Records', icon: 'search-outline', route: 'SearchMedicalRecords' },
+    { id: '10', title: 'Assigned Health Tasks', icon: 'clipboard-outline', route: 'AssignedHealthTasks' },
   ];
 
   const bottomItems = [
@@ -73,7 +87,6 @@ const CustomDrawer = ({ navigation, onClose }) => {
       setProfileData(data.user);
       
       // Set user type based on profile data
-      // Assuming your API returns userType or role field
       setUserType(data.user.userType || data.user.role || 'user');
       
     } catch (error) {
@@ -84,22 +97,8 @@ const CustomDrawer = ({ navigation, onClose }) => {
     }
   };
 
-  // Alternative method: Get user type from AsyncStorage if it's stored separately
-  const getUserType = async () => {
-    try {
-      const storedUserType = await AsyncStorage.getItem('userType');
-      if (storedUserType) {
-        setUserType(storedUserType);
-      }
-    } catch (error) {
-      console.error('Error getting user type:', error);
-    }
-  };
-
   useEffect(() => {
     fetchProfile();
-    // Uncomment this if you store userType separately in AsyncStorage
-    // getUserType();
   }, []);
 
   const handleNavigation = (route) => {
@@ -150,9 +149,9 @@ const CustomDrawer = ({ navigation, onClose }) => {
       onPress={() => handleNavigation(item.route)}
       activeOpacity={0.7}
     >
-      <Ionicons name={item.icon} size={24} color="#a4d9ab" />
+      <Ionicons name={item.icon} size={24} color="#315342" />
       <Text style={styles.menuText}>{item.title}</Text>
-      <Ionicons name="chevron-forward" size={20} color="#a4d9ab" />
+      <Ionicons name="chevron-forward" size={20} color="#4a7c59" />
     </TouchableOpacity>
   );
 
@@ -172,18 +171,88 @@ const CustomDrawer = ({ navigation, onClose }) => {
   };
 
   // Determine which menu items to show based on user type
-  const currentMenuItems = userType === 'admin' ? adminMenuItems : userMenuItems;
-  const sectionTitle = userType === 'admin' ? 'Admin Panel' : 'Main Menu';
+  const getMenuItems = () => {
+    switch(userType.toLowerCase()) {
+      case 'admin':
+      case 'administrator':
+        return adminMenuItems;
+      case 'vet':
+      case 'veterinarian':
+      case 'doctor':
+        return vetMenuItems;
+      default:
+        return userMenuItems;
+    }
+  };
+
+  const getSectionTitle = () => {
+    switch(userType.toLowerCase()) {
+      case 'admin':
+      case 'administrator':
+        return 'Admin Panel';
+      case 'vet':
+      case 'veterinarian':
+      case 'doctor':
+        return 'Veterinarian Dashboard';
+      default:
+        return 'Main Menu';
+    }
+  };
+
+  const getGradientColors = () => {
+    switch(userType.toLowerCase()) {
+      case 'admin':
+      case 'administrator':
+        return ['#315342', '#1e3a2a', '#0f1d15']; // Darker green gradient for admin
+      case 'vet':
+      case 'veterinarian':
+      case 'doctor':
+        return ['#4a7c59', '#315342', '#1e3a2a']; // Medium green gradient for vets
+      default:
+        return ['#5d8f6a', '#4a7c59', '#315342']; // Lighter green gradient for users
+    }
+  };
+
+  const getStats = () => {
+    switch(userType.toLowerCase()) {
+      case 'admin':
+      case 'administrator':
+        return [
+          { number: '25', label: 'Users' },
+          { number: '12', label: 'Animals' },
+          { number: '8', label: 'Vets' }
+        ];
+      case 'vet':
+      case 'veterinarian':
+      case 'doctor':
+        return [
+          { number: '42', label: 'Patients' },
+          { number: '15', label: 'Active Cases' },
+          { number: '128', label: 'Records' }
+        ];
+      default:
+        return [
+          { number: '12', label: 'Animals' },
+          { number: '8', label: 'Tasks' },
+          { number: '10', label: 'Vets' }
+        ];
+    }
+  };
+
+  const currentMenuItems = getMenuItems();
+  const sectionTitle = getSectionTitle();
+  const gradientColors = getGradientColors();
+  const stats = getStats();
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header Section */}
         <LinearGradient
-          colors={userType === 'admin' ? ['#315342', '#1e3a2a'] : ['#315342', '#1e3a2a']}
+          colors={gradientColors}
           style={styles.header}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <TouchableOpacity
             style={styles.closeButton}
@@ -203,33 +272,29 @@ const CustomDrawer = ({ navigation, onClose }) => {
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{user.name}</Text>
               <Text style={styles.profileEmail}>{user.email}</Text>
-              {userType === 'admin' && (
+              {(userType.toLowerCase() === 'admin' || userType.toLowerCase() === 'administrator') && (
                 <View style={styles.adminBadge}>
                   <Text style={styles.adminBadgeText}>Administrator</Text>
+                </View>
+              )}
+              {(userType.toLowerCase() === 'vet' || userType.toLowerCase() === 'veterinarian' || userType.toLowerCase() === 'doctor') && (
+                <View style={styles.vetBadge}>
+                  <Text style={styles.vetBadgeText}>Veterinarian</Text>
                 </View>
               )}
             </View>
           </View>
 
           <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>Animals</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>8</Text>
-              <Text style={styles.statLabel}>Tasks</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>
-                {userType === 'admin' ? '25' : '10'}
-              </Text>
-              <Text style={styles.statLabel}>
-                {userType === 'admin' ? 'Users' : 'Vets'}
-              </Text>
-            </View>
+            {stats.map((stat, index) => (
+              <React.Fragment key={index}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{stat.number}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+                {index < stats.length - 1 && <View style={styles.statDivider} />}
+              </React.Fragment>
+            ))}
           </View>
         </LinearGradient>
 
@@ -240,15 +305,15 @@ const CustomDrawer = ({ navigation, onClose }) => {
             {currentMenuItems.map(item => renderMenuItem(item))}
           </View>
 
-          {/* Special Offer Banner - Hide for admin */}
-          {userType !== 'admin' && (
+          {/* Special Offer Banner - Hide for admin and vet */}
+          {userType.toLowerCase() === 'user' && (
             <TouchableOpacity
               style={styles.offerBanner}
               onPress={() => handleNavigation('SpecialOffer')}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['rgba(49, 83, 66, 0.1)', 'rgba(30, 58, 42, 0.1)']}
+                colors={['rgba(93, 143, 106, 0.15)', 'rgba(49, 83, 66, 0.15)']}
                 style={styles.offerGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -265,6 +330,43 @@ const CustomDrawer = ({ navigation, onClose }) => {
             </TouchableOpacity>
           )}
 
+          {/* Veterinarian Quick Actions */}
+          {(userType.toLowerCase() === 'vet' || userType.toLowerCase() === 'veterinarian' || userType.toLowerCase() === 'doctor') && (
+            <View style={styles.quickActionsContainer}>
+              <Text style={styles.quickActionsTitle}>Quick Actions</Text>
+              <View style={styles.quickActionsGrid}>
+                <TouchableOpacity 
+                  style={styles.quickActionButton}
+                  onPress={() => handleNavigation('NewCheckup')}
+                >
+                  <Ionicons name="add-circle" size={24} color="#315342" />
+                  <Text style={styles.quickActionText}>New Checkup</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.quickActionButton, styles.emergencyButton]}
+                  onPress={() => handleNavigation('EmergencyAlert')}
+                >
+                  <Ionicons name="alarm" size={24} color="#d32f2f" />
+                  <Text style={styles.quickActionText}>Emergency</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.quickActionButton}
+                  onPress={() => handleNavigation('PrescribeMedicine')}
+                >
+                  <Ionicons name="medical" size={24} color="#4a7c59" />
+                  <Text style={styles.quickActionText}>Prescribe</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.quickActionButton}
+                  onPress={() => handleNavigation('ScheduleVaccination')}
+                >
+                  <Ionicons name="calendar" size={24} color="#5d8f6a" />
+                  <Text style={styles.quickActionText}>Schedule</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {/* Bottom Menu Items */}
           <View style={styles.bottomSection}>
             <View style={styles.divider} />
@@ -277,7 +379,7 @@ const CustomDrawer = ({ navigation, onClose }) => {
             onPress={handleLogout}
             activeOpacity={0.7}
           >
-            <Ionicons name="log-out-outline" size={24} color="#ff4757" />
+            <Ionicons name="log-out-outline" size={24} color="#d32f2f" />
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -289,82 +391,94 @@ const CustomDrawer = ({ navigation, onClose }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f7f2', // Light green background
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f7f2',
   },
   header: {
-    paddingTop: 20,
-    paddingBottom: 30,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    paddingVertical: 25,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
   },
   closeButton: {
     alignSelf: 'flex-end',
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 5,
   },
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
+    marginVertical: 20,
   },
   profileImage: {
     width: 70,
     height: 70,
     borderRadius: 35,
+    marginRight: 15,
     borderWidth: 3,
     borderColor: '#a4d9ab',
   },
   profileInfo: {
-    marginLeft: 15,
     flex: 1,
   },
   profileName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   profileEmail: {
     fontSize: 14,
     color: '#a4d9ab',
+    marginBottom: 8,
   },
   adminBadge: {
-    backgroundColor: '#ffd700',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginTop: 4,
+    backgroundColor: 'rgba(164, 217, 171, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#a4d9ab',
   },
   adminBadgeText: {
+    color: '#ffffff',
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#1e3a2a',
+    fontWeight: '600',
+  },
+  vetBadge: {
+    backgroundColor: 'rgba(164, 217, 171, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#a4d9ab',
+  },
+  vetBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 25,
-    paddingHorizontal: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(164, 217, 171, 0.2)',
+    borderRadius: 15,
+    paddingVertical: 15,
+    marginTop: 10,
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
   },
@@ -375,14 +489,12 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: 40,
-    backgroundColor: '#a4d9ab',
-    opacity: 0.5,
+    height: 30,
+    backgroundColor: 'rgba(164, 217, 171, 0.4)',
   },
   menuContainer: {
-    flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 25,
   },
   menuSection: {
     marginBottom: 20,
@@ -392,43 +504,102 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#315342',
     marginBottom: 15,
+    paddingLeft: 5,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 15,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     marginBottom: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#315342',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderLeftWidth: 3,
+    borderLeftColor: '#a4d9ab',
   },
   bottomMenuItem: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fcf9', // Very light green
   },
   menuText: {
     flex: 1,
-    marginLeft: 12,
     fontSize: 16,
     color: '#315342',
+    marginLeft: 15,
+    fontWeight: '500',
+  },
+  quickActionsContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#315342',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#e8f5e8',
+  },
+  quickActionsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#315342',
+    marginBottom: 15,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickActionButton: {
+    width: '48%',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    backgroundColor: '#f8fcf9',
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e8f5e8',
+  },
+  emergencyButton: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#ffebee',
+  },
+  quickActionText: {
+    fontSize: 12,
+    color: '#315342',
+    marginTop: 5,
+    textAlign: 'center',
     fontWeight: '500',
   },
   offerBanner: {
-    marginVertical: 20,
-    borderRadius: 16,
+    marginBottom: 20,
+    borderRadius: 15,
     overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#315342',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   offerGradient: {
     padding: 20,
+    backgroundColor: '#ffffff',
   },
   offerContent: {
     flexDirection: 'row',
@@ -439,39 +610,40 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   offerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#315342',
     marginBottom: 2,
   },
   offerSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#4a7c59',
   },
   bottomSection: {
-    marginTop: 20,
+    marginTop: 10,
   },
   divider: {
     height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 10,
+    backgroundColor: '#d4edb0',
+    marginVertical: 15,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     backgroundColor: '#fff5f5',
     borderRadius: 12,
     marginTop: 20,
+    marginBottom: 30,
     borderWidth: 1,
-    borderColor: '#ffebee',
+    borderColor: '#ffcccb',
   },
   logoutText: {
-    marginLeft: 8,
     fontSize: 16,
-    color: '#ff4757',
+    color: '#d32f2f',
+    marginLeft: 10,
     fontWeight: '600',
   },
 });

@@ -52,78 +52,83 @@ const Login = ({ navigation }) => {
   };
 
   const handleLogin = async () => {
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          password: password.trim()
-        })
-      });
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password: password.trim()
+      })
+    });
 
-      if (!response) {
-        throw new Error('No response from server');
-      }
-
-      const responseText = await response.text();
-      
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse JSON:', responseText);
-        throw new Error('Server returned invalid data');
-      }
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      if (!data.token || !data.user) {
-        throw new Error('Invalid response format');
-      }
-
-      await AsyncStorage.multiSet([
-        ['userToken', data.token],
-        ['userData', JSON.stringify(data.user)],
-        ['isAuthenticated', 'true'],
-        ['userId', data.user.id],
-        // ['userType', data.userType]
-      ]);
-
-      showToast('success', 'Login Successful', `Welcome back, ${data.user.name || data.user.email}!`);
-      
-      // Check user type and redirect accordingly
-      if (data.user.userType === 'admin') {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'AdminDashboard' }],
-        });
-      } else {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Home' }],
-        });
-      }
-
-    } catch (error) {
-      console.error('Login Error:', error);
-      showToast(
-        'error', 
-        'Login Failed', 
-        error.message || 'An error occurred during login'
-      );
-    } finally {
-      setLoading(false);
+    if (!response) {
+      throw new Error('No response from server');
     }
-  };
+
+    const responseText = await response.text();
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON:', responseText);
+      throw new Error('Server returned invalid data');
+    }
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Login failed');
+    }
+
+    if (!data.token || !data.user) {
+      throw new Error('Invalid response format');
+    }
+
+    await AsyncStorage.multiSet([
+      ['userToken', data.token],
+      ['userData', JSON.stringify(data.user)],
+      ['isAuthenticated', 'true'],
+      ['userId', data.user.id],
+      ['userType', data.user.userType] // Store user type for future reference
+    ]);
+
+    showToast('success', 'Login Successful', `Welcome back, ${data.user.name || data.user.email}!`);
+    
+    // Check user type and redirect accordingly
+    if (data.user.userType === 'admin') {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'AdminDashboard' }],
+      });
+    } else if (data.user.userType === 'vet') {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'VetDashboard' }],
+      });
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    }
+
+  } catch (error) {
+    console.error('Login Error:', error);
+    showToast(
+      'error', 
+      'Login Failed', 
+      error.message || 'An error occurred during login'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <KeyboardAvoidingView 
