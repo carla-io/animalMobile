@@ -29,5 +29,8 @@ app.use('/user', require('./routes/user')); // User routes
 app.use('/animal', require('./routes/animals')); // Animal routes
 
 app.use('/tasks', require('./routes/task')); 
+app.use('/medical-records', require('./routes/medicalRecords')); // Medical Records route
+
+
 
 app.listen(5000, () => console.log('Server is running'));

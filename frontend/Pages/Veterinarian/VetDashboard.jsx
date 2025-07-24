@@ -178,20 +178,23 @@ const VetDashboard = ({ navigation }) => {
   const renderRecordItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.recordItem}
-      onPress={() => navigation.navigate('RecordDetail', { recordId: item._id })}
+      onPress={() => navigation.navigate('MedicalRecordsStack', { 
+        screen: 'MedicalRecordDetail',
+        params: { recordId: item._id }
+      })}
       activeOpacity={0.8}
     >
       <View style={styles.recordIconContainer}>
         <Ionicons 
-          name={getRecordIcon(item.type)} 
+          name={getRecordIcon(item.recordType)} 
           size={24} 
           color="#315342" 
         />
       </View>
       <View style={styles.recordInfo}>
-        <Text style={styles.recordTitle}>{item.type} for {item.animal?.name || 'Animal'}</Text>
+        <Text style={styles.recordTitle}>{item.recordType} for {item.animal?.name || 'Animal'}</Text>
         <Text style={styles.recordDate}>{formatDate(item.date)}</Text>
-        <Text style={styles.recordNotes} numberOfLines={1}>{item.notes}</Text>
+        <Text style={styles.recordNotes} numberOfLines={1}>{item.description}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -377,12 +380,15 @@ const VetDashboard = ({ navigation }) => {
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Medical Records</Text>
                 <View style={styles.recordActions}>
-                  <TouchableOpacity onPress={() => navigation.navigate('AllRecords')}>
+                  <TouchableOpacity onPress={() => navigation.navigate('MedicalRecordsStack')}>
                     <Text style={styles.seeAll}>See All</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={styles.filterButton}
-                    onPress={() => navigation.navigate('FilterRecords')}
+                    onPress={() => navigation.navigate('MedicalRecordsStack', {
+                      screen: 'MedicalRecords',
+                      params: { filter: true }
+                    })}
                   >
                     <Ionicons name="filter" size={18} color="#315342" />
                   </TouchableOpacity>
@@ -399,7 +405,9 @@ const VetDashboard = ({ navigation }) => {
               />
               <TouchableOpacity 
                 style={styles.addButton}
-                onPress={() => navigation.navigate('AddRecord')}
+                onPress={() => navigation.navigate('MedicalRecordsStack', {
+                  screen: 'AddMedicalRecord'
+                })}
               >
                 <Ionicons name="add" size={24} color="#fff" />
                 <Text style={styles.addButtonText}>Add New Record</Text>

@@ -17,11 +17,10 @@ import AnimalProfiles from './Pages/Admin/AnimalProfiles';
 import TaskManagement from './Pages/Admin/TaskManagement';
 import VetDashboard from './Pages/Veterinarian/VetDashboard'; // New import
 import Schedule from './Pages/Admin/Schedule';
-/* import MedicalRecords from './Pages/Veterinarian/MedicalRecords'; // New import
-import AddRecord from './Pages/Veterinarian/AddRecord'; // New import
-import RecordDetail from './Pages/Veterinarian/RecordDetail'; // New import
-import GenerateReport from './Pages/Veterinarian/GenerateReport'; // New import
-import VaccinationSchedule from './Pages/Veterinarian/VaccinationSchedule'; // New import */
+import MedicalCheckups from './Pages/Veterinarian/MedicalCheckups'
+import Treatments from './Pages/Veterinarian/Treatments'
+import VaccinationRecords from './Pages/Veterinarian/VaccinationRecords'
+import MedicalHistory from './Pages/Veterinarian/MedicalHistory'
 
 const Stack = createStackNavigator();
 
@@ -97,42 +96,64 @@ export default function App() {
             options={{ headerShown: false }}
           />
           
-          {/* Veterinarian Screens */}
-          <Stack.Screen
-            name="VetDashboard"
-            component={VetDashboard}
-            options={{ headerShown: false }}
-          />
-      <Stack.Screen
-  name="AnimalProfile"
-  component={ViewAnimalProfile}
-  options={{ headerShown: false }}
-/>
-       {/*    <Stack.Screen
-            name="MedicalRecords"
-            component={MedicalRecords}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="AddRecord"
-            component={AddRecord}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="RecordDetail"
-            component={RecordDetail}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="GenerateReport"
-            component={GenerateReport}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="VaccinationSchedule"
-            component={VaccinationSchedule}
-            options={{ headerShown: false }}
-          /> */}
+         {/* ===== VETERINARIAN STACK ===== */}
+          <Stack.Group>
+            <Stack.Screen
+              name="VetDashboard"
+              component={VetDashboard}
+              options={{ headerShown: false }}
+            />
+            {/* <Stack.Screen
+              name="MedicalRecordsStack"
+              component={MedicalRecordRoutes}
+              options={{ headerShown: false }}
+            /> */}
+            <Stack.Screen
+              name="MedicalCheckups"
+              component={MedicalCheckups}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Treatments"
+              component={Treatments}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="VaccinationRecords"
+              component={VaccinationRecords}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="MedicalHistory"
+              component={MedicalHistory}
+              options={{ headerShown: false }}
+            />
+            {/* <Stack.Screen
+              name="HealthReports"
+              component={HealthReports}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EmergencyCases"
+              component={EmergencyCases}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="SearchMedicalRecords"
+              component={SearchMedicalRecords}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="AssignedHealthTasks"
+              component={AssignedHealthTasks}
+              options={{ headerShown: false }}
+            /> */}
+            <Stack.Screen
+              name="AnimalProfile"
+              component={ViewAnimalProfile}
+              options={{ headerShown: false }}
+            />
+          </Stack.Group>
           
           {/* Common Components */}
           <Stack.Screen

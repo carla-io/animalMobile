@@ -510,6 +510,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 25,
+    marginBottom: 20,
   },
   footerText: {
     color: '#666',
