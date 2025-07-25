@@ -106,5 +106,17 @@ router.get('/getAllUsersOnly', async (req, res) => {
   }
 });
 
+// GET only users with userType = 'vet'
+router.get('/getAllVetsOnly', async (req, res) => {
+  try {
+    const vets = await User.find({ userType: 'vet' }, '-password');
+    res.status(200).json({ success: true, users: vets });
+  } catch (error) {
+    console.error('Error fetching vet-type users:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+
 
 module.exports = router;

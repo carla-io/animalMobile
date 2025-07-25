@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import API_BASE_URL from '../../utils/api';
 import CustomDrawer from '../CustomDrawer';
+import SeekVetModal from './SeekVetModal'; // Adjust path as needed
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,6 +41,8 @@ const AllBehaviorsScreen = ({ navigation }) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedBehavior, setSelectedBehavior] = useState(null);
+  const [seekVetModalVisible, setSeekVetModalVisible] = useState(false);
+const [selectedAnimalForVet, setSelectedAnimalForVet] = useState(null);
 
   // Animation values for drawer
   const [slideAnim] = useState(new Animated.Value(-width * 0.8));
@@ -51,7 +54,20 @@ const AllBehaviorsScreen = ({ navigation }) => {
     { key: 'today', label: 'Today' },
     { key: 'week', label: 'This Week' },
   ];
+  
+  // Handle opening seek vet modal
+const handleSeekVet = (behavior) => {
+  setSelectedAnimalForVet(behavior.animalId);
+  setSeekVetModalVisible(true);
+};
 
+// Handle successful vet assignment
+const handleVetAssignSuccess = (assignment) => {
+  // You can add any additional logic here, like refreshing data
+  console.log('Vet assigned successfully:', assignment);
+  // Optionally refresh behaviors list
+  fetchBehaviors();
+};
   // Drawer animation functions
   const openDrawer = () => {
     setDrawerVisible(true);
@@ -213,25 +229,38 @@ const AllBehaviorsScreen = ({ navigation }) => {
         )}
       </View>
 
-      <View style={styles.behaviorFooter}>
-        <View style={styles.timeInfo}>
-          <Clock size={14} color="#718096" />
-          <Text style={styles.timeText}>
-            {formatDate(behavior.createdAt)}
-          </Text>
-        </View>
+     <View style={styles.behaviorFooter}>
+  <View style={styles.timeInfo}>
+    <Clock size={14} color="#718096" />
+    <Text style={styles.timeText}>
+      {formatDate(behavior.createdAt)}
+    </Text>
+  </View>
 
-        <TouchableOpacity
-          style={styles.viewButton}
-          onPress={() => {
-            setSelectedBehavior(behavior);
-            setDetailModalVisible(true);
-          }}
-        >
-          <Eye size={16} color="#315342" />
-          <Text style={styles.viewButtonText}>View Details</Text>
-        </TouchableOpacity>
-      </View>
+  <View style={styles.footerButtons}>
+    {/* Show Seek Vet button for critical behaviors */}
+    {isCriticalBehavior(behavior) && (
+      <TouchableOpacity
+        style={styles.seekVetButton}
+        onPress={() => handleSeekVet(behavior)}
+      >
+        <AlertTriangle size={16} color="#e53e3e" />
+        <Text style={styles.seekVetButtonText}>Seek Vet</Text>
+      </TouchableOpacity>
+    )}
+    
+    <TouchableOpacity
+      style={styles.viewButton}
+      onPress={() => {
+        setSelectedBehavior(behavior);
+        setDetailModalVisible(true);
+      }}
+    >
+      <Eye size={16} color="#315342" />
+      <Text style={styles.viewButtonText}>View Details</Text>
+    </TouchableOpacity>
+  </View>
+</View>
     </View>
   );
 
@@ -487,10 +516,20 @@ const AllBehaviorsScreen = ({ navigation }) => {
         </View>
       )}
 
+      
+  {/* Seek Vet Modal */}
+<SeekVetModal
+  visible={seekVetModalVisible}
+  onClose={() => setSeekVetModalVisible(false)}
+  selectedAnimal={selectedAnimalForVet}
+  onAssignSuccess={handleVetAssignSuccess}
+/>
+
       {/* Detail Modal */}
       {renderDetailModal()}
     </SafeAreaView>
   );
+
 };
 
 const styles = StyleSheet.create({
@@ -898,6 +937,28 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 16,
   },
+  footerButtons: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+seekVetButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 8,
+  backgroundColor: '#fef5e7',
+  borderWidth: 1,
+  borderColor: '#e53e3e',
+  marginRight: 8,
+},
+seekVetButtonText: {
+  fontSize: 12,
+  color: '#e53e3e',
+  marginLeft: 4,
+  fontWeight: '600',
+},
 });
 
 export default AllBehaviorsScreen;
