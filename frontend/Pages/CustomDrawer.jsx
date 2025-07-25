@@ -26,9 +26,9 @@ const CustomDrawer = ({ navigation, onClose }) => {
 
   // Regular user menu items
   const userMenuItems = [
-    { id: '1', title: 'View Assigned Tasks', icon: 'clipboard-outline', route: 'AssignedTasks' },
-    { id: '2', title: 'Input Daily Animal Behavior', icon: 'create-outline', route: 'AnimalBehaviorInput' },
-    { id: '3', title: 'View Animal', icon: 'paw-outline', route: 'AnimalView' },
+       { id: '1', title: 'View Assigned Tasks', icon: 'clipboard-outline', route: 'AssignedTasks' },
+     { id: '2', title: 'Input Daily Animal Behavior', icon: 'create-outline', route: 'AddBehavior' },
+     { id: '3', title: 'View Animal', icon: 'paw-outline', route: 'AnimalView' },
   ];
 
   // Admin menu items
@@ -38,7 +38,7 @@ const CustomDrawer = ({ navigation, onClose }) => {
     { id: '3', title: 'Animal Profiles', icon: 'paw-outline', route: 'AnimalProfiles' },
     { id: '4', title: 'Task Management', icon: 'checkmark-circle-outline', route: 'TaskManagement' },
     { id: '5', title: 'Schedules', icon: 'calendar-outline', route: 'Schedule' },
-    // { id: '6', title: 'Health Logs', icon: 'document-text-outline', route: 'HealthLogs' },
+    { id: '6', title: 'Behavior Logs', icon: 'document-text-outline', route: 'Behavior' },
     // { id: '7', title: 'Reports', icon: 'download-outline', route: 'Reports' },
     // { id: '8', title: 'System Settings', icon: 'settings-outline', route: 'SystemSettings' },
   ];

@@ -30,6 +30,7 @@ app.use('/animal', require('./routes/animals')); // Animal routes
 
 app.use('/tasks', require('./routes/task')); 
 app.use('/medical-records', require('./routes/medicalRecords')); // Medical Records route
+app.use('/behavior', require('./routes/behavior')); // Animal behavior routes
 
 
 

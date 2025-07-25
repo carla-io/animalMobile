@@ -11,6 +11,10 @@ import Home from './Pages/Home';
 import CustomDrawer from './Pages/CustomDrawer';
 import ViewAssignedTasks from './Pages/Task/ViewAssignedTasks';
 import ViewAnimalProfile from './Pages/AnimalProf/viewAnimalProfile';
+import AnimalDetailView from './Pages/AnimalProf/AnimalDetailView';
+import ViewDetailedTask from './Pages/Task/ViewDetailedTask';
+import CalendarTask from './Pages/Task/CalendarTask';
+import AddBehavior from './Pages/Behavior/AddBehavior';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import UserManagement from './Pages/Admin/UserManagement';
 import AnimalProfiles from './Pages/Admin/AnimalProfiles';
@@ -21,6 +25,7 @@ import MedicalCheckups from './Pages/Veterinarian/MedicalCheckups'
 import Treatments from './Pages/Veterinarian/Treatments'
 import VaccinationRecords from './Pages/Veterinarian/VaccinationRecords'
 import MedicalHistory from './Pages/Veterinarian/MedicalHistory'
+import Behavior from './Pages/Admin/Behaviors';
 
 const Stack = createStackNavigator();
 
@@ -53,7 +58,7 @@ export default function App() {
           />
           
           {/* User Screens */}
-          <Stack.Screen 
+           <Stack.Screen 
             name="Home" 
             component={Home} 
             options={{ headerShown: false }} 
@@ -64,8 +69,28 @@ export default function App() {
             options={{ headerShown: false }} 
           />
           <Stack.Screen
-            name="AnimalView"
+            name="AnimalView" 
             component={ViewAnimalProfile}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ViewDetailedTask" 
+            component={ViewDetailedTask}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="CalendarTask" 
+            component={CalendarTask}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AddBehavior" 
+            component={AddBehavior}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AnimalDetailView" 
+            component={AnimalDetailView}
             options={{ headerShown: false }}
           />
           
@@ -93,6 +118,11 @@ export default function App() {
             <Stack.Screen
             name="Schedule" // 🔗 route must match the drawer item
             component={Schedule}
+            options={{ headerShown: false }}
+          />
+           <Stack.Screen
+            name="Behavior" // 🔗 route must match the drawer item
+            component={Behavior}
             options={{ headerShown: false }}
           />
           
