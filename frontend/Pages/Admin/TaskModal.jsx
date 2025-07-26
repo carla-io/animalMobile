@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -16,6 +15,7 @@ import {
   StatusBar,
   FlatList,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -32,6 +32,7 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
   const [showDropdown, setShowDropdown] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState({ show: false, field: null });
   const [showTimePicker, setShowTimePicker] = useState({ show: false, index: -1 });
+  const [showImageModal, setShowImageModal] = useState(false);
 
   const [formData, setFormData] = useState({
     type: '',
@@ -42,7 +43,10 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
     status: 'Pending',
     isRecurring: false,
     recurrencePattern: 'Daily',
-    endDate: ''
+    endDate: '',
+    completedAt: '',
+    completionVerified: false,
+    imageProof: ''
   });
 
   useEffect(() => {
@@ -144,7 +148,10 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
         status: editingTask.status || 'Pending',
         isRecurring: editingTask.isRecurring || false,
         recurrencePattern: editingTask.recurrencePattern || 'Daily',
-        endDate: editingTask.endDate ? new Date(editingTask.endDate).toISOString().split('T')[0] : ''
+        endDate: editingTask.endDate ? new Date(editingTask.endDate).toISOString().split('T')[0] : '',
+        completedAt: editingTask.completedAt || '',
+        completionVerified: editingTask.completionVerified || false,
+        imageProof: editingTask.imageProof || ''
       });
       Toast.show({
         type: 'info',
@@ -161,7 +168,10 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
         status: 'Pending',
         isRecurring: false,
         recurrencePattern: 'Daily',
-        endDate: ''
+        endDate: '',
+        completedAt: '',
+        completionVerified: false,
+        imageProof: ''
       });
     }
   }, [editingTask]);
@@ -295,12 +305,23 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
       scheduleDate: formData.scheduleDate,
       scheduleTimes: validTimes,
       status: formData.status,
-      isRecurring: formData.isRecurring
+      isRecurring: formData.isRecurring,
+      completionVerified: formData.completionVerified
     };
 
     if (formData.isRecurring) {
       payload.recurrencePattern = formData.recurrencePattern;
       payload.endDate = formData.endDate;
+    }
+
+    // Include imageProof if it exists
+    if (formData.imageProof) {
+      payload.imageProof = formData.imageProof;
+    }
+
+    // Include completedAt if status is completed
+    if (formData.status === 'Completed' && formData.completedAt) {
+      payload.completedAt = formData.completedAt;
     }
 
     try {
@@ -368,13 +389,17 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
       status: 'Pending',
       isRecurring: false,
       recurrencePattern: 'Daily',
-      endDate: ''
+      endDate: '',
+      completedAt: '',
+      completionVerified: false,
+      imageProof: ''
     });
     setEditingTask(null);
     setShowTaskModal(false);
     setShowDropdown(null);
     setShowDatePicker({ show: false, field: null });
     setShowTimePicker({ show: false, index: -1 });
+    setShowImageModal(false);
     Toast.show({
       type: 'info',
       text1: 'Task form closed',
@@ -391,6 +416,18 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
     });
   };
 
+  const formatDateTime = (dateTimeString) => {
+    if (!dateTimeString) return '';
+    const date = new Date(dateTimeString);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const formatTime = (timeString) => {
     if (!timeString) return '';
     const [hours, minutes] = timeString.split(':');
@@ -398,6 +435,82 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  // Image Proof Component
+  const ImageProofSection = () => {
+    if (!formData.imageProof && !editingTask) return null;
+
+    return (
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Completion Proof</Text>
+        {formData.imageProof ? (
+          <View style={styles.imageProofContainer}>
+            <TouchableOpacity
+              style={styles.imageProofThumbnail}
+              onPress={() => setShowImageModal(true)}
+            >
+              <Image
+                source={{ uri: formData.imageProof }}
+                style={styles.thumbnailImage}
+                resizeMode="cover"
+              />
+              <View style={styles.imageOverlay}>
+                <Ionicons name="expand" size={20} color="#fff" />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.imageProofInfo}>
+              <View style={styles.imageProofHeader}>
+                <Ionicons name="camera" size={16} color="#315342" />
+                <Text style={styles.imageProofLabel}>Image Proof Available</Text>
+                {formData.completionVerified && (
+                  <Ionicons name="checkmark-circle" size={16} color="#28a745" />
+                )}
+              </View>
+              <Text style={styles.imageProofText}>
+                Tap to view full image
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.noImageProofContainer}>
+            <Ionicons name="camera-outline" size={24} color="#999" />
+            <Text style={styles.noImageProofText}>No image proof provided</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // Completion Info Section
+  const CompletionInfoSection = () => {
+    if (!editingTask || formData.status !== 'Completed') return null;
+
+    return (
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Completion Details</Text>
+        <View style={styles.completionInfoContainer}>
+          {formData.completedAt && (
+            <View style={styles.completionInfoRow}>
+              <Ionicons name="time" size={16} color="#315342" />
+              <Text style={styles.completionInfoText}>
+                Completed: {formatDateTime(formData.completedAt)}
+              </Text>
+            </View>
+          )}
+          <View style={styles.completionInfoRow}>
+            <Ionicons 
+              name={formData.completionVerified ? "checkmark-circle" : "help-circle"} 
+              size={16} 
+              color={formData.completionVerified ? "#28a745" : "#ffc107"} 
+            />
+            <Text style={styles.completionInfoText}>
+              Verification: {formData.completionVerified ? "Verified" : "Pending"}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   // Fixed CustomDropdown component to remove nested FlatList
@@ -693,6 +806,12 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
               placeholder="Select status"
               fieldKey="status"
             />
+
+            {/* Image Proof Section */}
+            <ImageProofSection />
+
+            {/* Completion Info Section */}
+            <CompletionInfoSection />
           </ScrollView>
 
           {/* Footer Buttons */}
@@ -776,6 +895,41 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
             </View>
           </View>
         </Modal>
+
+        {/* Image Proof Modal */}
+        <Modal visible={showImageModal} transparent animationType="fade">
+          <View style={styles.imageModalOverlay}>
+            <TouchableOpacity
+              style={styles.imageModalCloseArea}
+              onPress={() => setShowImageModal(false)}
+              activeOpacity={1}
+            >
+              <View style={styles.imageModalContent}>
+                <View style={styles.imageModalHeader}>
+                  <Text style={styles.imageModalTitle}>Task Completion Proof</Text>
+                  <TouchableOpacity onPress={() => setShowImageModal(false)}>
+                    <Ionicons name="close" size={24} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                {formData.imageProof && (
+                  <Image
+                    source={{ uri: formData.imageProof }}
+                    style={styles.fullSizeImage}
+                    resizeMode="contain"
+                  />
+                )}
+                <View style={styles.imageModalFooter}>
+                  <View style={styles.imageModalInfo}>
+                    <Ionicons name="information-circle" size={16} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.imageModalInfoText}>
+                      Tap outside to close
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Modal>
       </SafeAreaView>
     </Modal>
   );
@@ -785,26 +939,38 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    paddingTop: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight,
   },
   modalContainer: {
     backgroundColor: '#fff',
-    marginHorizontal: 20,
-    borderRadius: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     maxHeight: '90%',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    minHeight: '60%',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#315342',
+    fontWeight: '500',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
   modalTitle: {
     fontSize: 20,
@@ -812,33 +978,47 @@ const styles = StyleSheet.create({
     color: '#315342',
   },
   closeButton: {
-    padding: 5,
+    padding: 4,
   },
   modalContent: {
-    padding: 20,
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   formGroup: {
     marginBottom: 20,
-    position: 'relative',
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#315342',
     marginBottom: 8,
   },
-  
-  // Custom Dropdown Styles
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  switchLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: '#315342',
+    marginLeft: 12,
+  },
   dropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    minHeight: 48,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   dropdownButtonOpen: {
     borderColor: '#315342',
@@ -851,42 +1031,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dropdownIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   dropdownText: {
     fontSize: 16,
-    color: '#333',
-    flex: 1,
+    color: '#315342',
   },
   placeholderText: {
     color: '#999',
   },
   dropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#315342',
     borderTopWidth: 0,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
     maxHeight: 200,
-    zIndex: 1000,
-    elevation: 5,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  dropdownFlatList: {
+  dropdownScrollView: {
     maxHeight: 200,
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -895,29 +1069,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f8f4',
   },
   dropdownItemIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   dropdownItemText: {
+    flex: 1,
     fontSize: 16,
     color: '#333',
-    flex: 1,
   },
   dropdownItemTextSelected: {
     color: '#315342',
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  
-  // Date Picker Styles
   datePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    minHeight: 48,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   datePickerContent: {
     flexDirection: 'row',
@@ -925,22 +1097,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   dateText: {
     fontSize: 16,
-    color: '#333',
+    color: '#315342',
   },
-  
-  // Time Picker Styles
   timeSlotContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   timeInputContainer: {
     flex: 1,
-    marginRight: 10,
   },
   timePickerContainer: {
     flex: 1,
@@ -949,12 +1118,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    minHeight: 48,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   timePickerContent: {
     flexDirection: 'row',
@@ -962,119 +1131,166 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   timeIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   timeText: {
     fontSize: 16,
-    color: '#333',
+    color: '#315342',
   },
   removeTimeButton: {
-    padding: 5,
+    marginLeft: 12,
+    padding: 4,
   },
   addTimeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    justifyContent: 'center',
+    backgroundColor: '#f0f8f4',
     borderWidth: 1,
     borderColor: '#315342',
-    borderRadius: 8,
-    borderStyle: 'dashed',
-    backgroundColor: '#f0f8f4',
-    marginTop: 5,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 8,
   },
   addTimeText: {
-    marginLeft: 5,
+    fontSize: 16,
     color: '#315342',
-    fontSize: 16,
     fontWeight: '500',
+    marginLeft: 8,
   },
-  
-  // Switch Styles
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#f0f8f4',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0f2e0',
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: '#333',
-    flex: 1,
-    marginLeft: 10,
-  },
-  
-  // Warning Styles
   warningContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff3cd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ffeaa7',
+    marginBottom: 20,
   },
   warningText: {
-    marginLeft: 10,
-    color: '#856404',
+    flex: 1,
     fontSize: 14,
+    color: '#856404',
+    marginLeft: 12,
+  },
+  // Image Proof Styles
+  imageProofContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 12,
+  },
+  imageProofThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageProofInfo: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  imageProofHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  imageProofLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#315342',
+    marginLeft: 8,
     flex: 1,
   },
-  
-  // Modal Footer
+  imageProofText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  noImageProofContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingVertical: 24,
+  },
+  noImageProofText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+  },
+  // Completion Info Styles
+  completionInfoContainer: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 12,
+  },
+  completionInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  completionInfoText: {
+    fontSize: 14,
+    color: '#315342',
+    marginLeft: 8,
+    flex: 1,
+  },
   modalFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#e0e0e0',
+    gap: 12,
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
   },
   cancelButton: {
-    backgroundColor: '#6c757d',
-    marginRight: 10,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   cancelButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    color: '#666',
   },
   submitButton: {
     backgroundColor: '#315342',
-    marginLeft: 10,
   },
   submitButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
   },
-  
-  // Loading Styles
-  loadingContainer: {
-    backgroundColor: '#fff',
-    padding: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 50,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  
   // Picker Modal Styles
   pickerModalOverlay: {
     flex: 1,
@@ -1084,22 +1300,18 @@ const styles = StyleSheet.create({
   },
   pickerModalContent: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    width: width * 0.8,
+    borderRadius: 16,
+    width: width * 0.85,
     maxHeight: '70%',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
   pickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
   pickerTitle: {
     fontSize: 18,
@@ -1108,37 +1320,91 @@ const styles = StyleSheet.create({
   },
   dateInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    margin: 20,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
-    margin: 16,
+    color: '#315342',
   },
   pickerConfirmButton: {
     backgroundColor: '#315342',
-    margin: 16,
-    padding: 12,
-    borderRadius: 8,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
   pickerConfirmText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
   },
   timeOptionsList: {
     maxHeight: 300,
   },
   timeOption: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   timeOptionText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
+    color: '#315342',
+  },
+  // Image Modal Styles
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+  },
+  imageModalCloseArea: {
+    flex: 1,
+  },
+  imageModalContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  imageModalHeader: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 1,
+  },
+  imageModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  fullSizeImage: {
+    width: '100%',
+    height: '70%',
+  },
+  imageModalFooter: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 60 : 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  imageModalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  imageModalInfoText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginLeft: 8,
   },
 });
 

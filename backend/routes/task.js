@@ -54,16 +54,39 @@ router.post('/add', async (req, res) => {
 // ================================
 // GET all tasks (detailed view)
 // ================================
+// ================================
+// GET all tasks (detailed view)
+// ================================
 router.get('/getAll', async (req, res) => {
   try {
     const tasks = await Task.find()
       .populate('assignedTo')
       .populate('animalId');
-    res.json(tasks);
+
+    const taskData = tasks.map(task => ({
+      _id: task._id,
+      type: task.type,
+      assignedTo: task.assignedTo,
+      animalId: task.animalId,
+      scheduleDate: task.scheduleDate,
+      scheduleTimes: task.scheduleTimes,
+      isRecurring: task.isRecurring,
+      recurrencePattern: task.recurrencePattern,
+      endDate: task.endDate,
+      status: task.status,
+      completedAt: task.completedAt,
+      completionVerified: task.completionVerified, // ✅ include this
+      imageProof: task.imageProof, // ✅ include this
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt
+    }));
+
+    res.json(taskData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // ================================
 // GET calendar-friendly tasks

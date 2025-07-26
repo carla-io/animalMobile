@@ -15,6 +15,7 @@ import {
   StatusBar,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getStatusBarHeight } from 'react-native-status-bar-height';
@@ -35,6 +36,8 @@ const TaskManagement = ({ navigation }) => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
   
   const slideAnim = useRef(new Animated.Value(-width * 0.8)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -212,6 +215,11 @@ const TaskManagement = ({ navigation }) => {
     );
   };
 
+  const handleViewImage = (imageUri) => {
+    setSelectedImage(imageUri);
+    setImageModalVisible(true);
+  };
+
   const formatDateTime = (date, times) => {
     if (!date && (!times || times.length === 0)) return 'Not set';
     
@@ -291,7 +299,36 @@ const TaskManagement = ({ navigation }) => {
             {' '}Recurring: {item.recurrencePattern}
           </Text>
         )}
+        {item.completionVerified && (
+          <Text style={styles.verifiedInfo}>
+            <Ionicons name="checkmark-circle" size={14} color="#28a745" />
+            {' '}Completion Verified
+          </Text>
+        )}
       </View>
+
+      {/* Image Proof Section */}
+      {item.imageProof && (
+        <View style={styles.imageProofSection}>
+          <Text style={styles.imageProofLabel}>
+            <Ionicons name="camera" size={14} color="#315342" />
+            {' '}Completion Proof:
+          </Text>
+          <TouchableOpacity 
+            style={styles.imageProofContainer}
+            onPress={() => handleViewImage(item.imageProof)}
+          >
+            <Image 
+              source={{ uri: item.imageProof }} 
+              style={styles.imageProofThumbnail}
+              resizeMode="cover"
+            />
+            <View style={styles.imageOverlay}>
+              <Ionicons name="expand" size={20} color="#fff" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
       
       <View style={styles.taskActions}>
         <TouchableOpacity
@@ -374,6 +411,36 @@ const TaskManagement = ({ navigation }) => {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderImageModal = () => (
+    <Modal
+      visible={imageModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setImageModalVisible(false)}
+    >
+      <View style={styles.imageModalOverlay}>
+        <View style={styles.imageModalContainer}>
+          <View style={styles.imageModalHeader}>
+            <Text style={styles.imageModalTitle}>Completion Proof</Text>
+            <TouchableOpacity 
+              onPress={() => setImageModalVisible(false)}
+              style={styles.imageModalCloseButton}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          {selectedImage && (
+            <Image 
+              source={{ uri: selectedImage }} 
+              style={styles.fullSizeImage}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </View>
     </Modal>
@@ -491,6 +558,9 @@ const TaskManagement = ({ navigation }) => {
 
       {/* Filter Modal */}
       {renderFilterModal()}
+
+      {/* Image Modal */}
+      {renderImageModal()}
       
       {/* Toast */}
       <Toast />
