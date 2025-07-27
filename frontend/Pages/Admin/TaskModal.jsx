@@ -238,6 +238,22 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
     }
   };
 
+  // NEW: Handle verification toggle and automatically update status
+  const handleVerificationToggle = (isVerified) => {
+    setFormData(prev => ({
+      ...prev,
+      completionVerified: isVerified,
+      status: isVerified ? 'Completed' : 'Pending',
+      completedAt: isVerified && !prev.completedAt ? new Date().toISOString() : prev.completedAt
+    }));
+
+    Toast.show({
+      type: isVerified ? 'success' : 'info',
+      text1: isVerified ? 'Task marked as completed' : 'Task marked as pending',
+      text2: isVerified ? 'Verification approved and task completed' : 'Verification removed and task set to pending',
+    });
+  };
+
   const validateForm = () => {
     if (!formData.type || !formData.animal || !formData.assignedTo || !formData.scheduleDate) {
       Toast.show({
@@ -437,13 +453,39 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  // Image Proof Component
+  // NEW: Verification Status Button Component
+  const VerificationStatusButton = () => {
+    if (!formData.imageProof) return null;
+
+    const isVerified = formData.completionVerified;
+    const buttonStyle = isVerified ? styles.verifiedButton : styles.unverifiedButton;
+    const textStyle = isVerified ? styles.verifiedButtonText : styles.unverifiedButtonText;
+    const iconName = isVerified ? 'checkmark-circle' : 'alert-circle';
+    const iconColor = isVerified ? '#28a745' : '#ffc107';
+
+    return (
+      <View style={styles.verificationStatusContainer}>
+        <TouchableOpacity 
+          style={[styles.verificationStatusButton, buttonStyle]}
+          onPress={() => setShowImageModal(true)}
+        >
+          <Ionicons name={iconName} size={20} color={iconColor} />
+          <Text style={[styles.verificationStatusText, textStyle]}>
+            {isVerified ? 'Task Verified & Completed' : 'Task Awaiting Verification'}
+          </Text>
+          <Ionicons name="eye" size={16} color={isVerified ? '#28a745' : '#ffc107'} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Enhanced Image Proof Component with Verification Controls
   const ImageProofSection = () => {
     if (!formData.imageProof && !editingTask) return null;
 
     return (
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Completion Proof</Text>
+        <Text style={styles.label}>Completion Proof & Verification</Text>
         {formData.imageProof ? (
           <View style={styles.imageProofContainer}>
             <TouchableOpacity
@@ -470,26 +512,83 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
               <Text style={styles.imageProofText}>
                 Tap to view full image
               </Text>
+              
+              {/* NEW: Enhanced Admin Verification Controls */}
+              <View style={styles.verificationContainer}>
+                <View style={styles.verificationToggle}>
+                  <View style={styles.verificationInfo}>
+                    <Ionicons 
+                      name={formData.completionVerified ? "shield-checkmark" : "shield-outline"} 
+                      size={18} 
+                      color={formData.completionVerified ? "#28a745" : "#ffc107"} 
+                    />
+                    <Text style={styles.verificationLabel}>
+                      Admin Verification
+                    </Text>
+                  </View>
+                  <Switch
+                    value={formData.completionVerified}
+                    onValueChange={handleVerificationToggle}
+                    trackColor={{ false: '#767577', true: '#28a745' }}
+                    thumbColor={formData.completionVerified ? '#fff' : '#f4f3f4'}
+                    style={styles.verificationSwitch}
+                  />
+                </View>
+                <View style={styles.verificationStatusIndicator}>
+                  <View style={[
+                    styles.statusDot, 
+                    { backgroundColor: formData.completionVerified ? '#28a745' : '#ffc107' }
+                  ]} />
+                  <Text style={[
+                    styles.verificationDescription,
+                    { color: formData.completionVerified ? '#28a745' : '#ffc107' }
+                  ]}>
+                    {formData.completionVerified 
+                      ? "✓ Verified - Task automatically marked as COMPLETED"
+                      : "⚠ Unverified - Task status set to PENDING"
+                    }
+                  </Text>
+                </View>
+                <Text style={styles.verificationNote}>
+                  Note: Verifying this image proof will automatically change the task status to "Completed". 
+                  Removing verification will set the status to "Pending".
+                </Text>
+              </View>
             </View>
           </View>
         ) : (
           <View style={styles.noImageProofContainer}>
             <Ionicons name="camera-outline" size={24} color="#999" />
             <Text style={styles.noImageProofText}>No image proof provided</Text>
+            <Text style={styles.noVerificationNote}>Cannot verify task completion without image proof</Text>
           </View>
         )}
       </View>
     );
   };
 
-  // Completion Info Section
+  // Enhanced Completion Info Section
   const CompletionInfoSection = () => {
-    if (!editingTask || formData.status !== 'Completed') return null;
+    if (!editingTask) return null;
 
     return (
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Completion Details</Text>
+        <Text style={styles.label}>Task Status Overview</Text>
         <View style={styles.completionInfoContainer}>
+          <View style={styles.completionInfoRow}>
+            <Ionicons 
+              name={formData.status === 'Completed' ? "checkmark-circle" : "time"} 
+              size={16} 
+              color={formData.status === 'Completed' ? "#28a745" : "#ffc107"} 
+            />
+            <Text style={[
+              styles.completionInfoText,
+              { color: formData.status === 'Completed' ? "#28a745" : "#ffc107" }
+            ]}>
+              Current Status: {formData.status}
+            </Text>
+          </View>
+
           {formData.completedAt && (
             <View style={styles.completionInfoRow}>
               <Ionicons name="time" size={16} color="#315342" />
@@ -498,14 +597,32 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
               </Text>
             </View>
           )}
+          
           <View style={styles.completionInfoRow}>
             <Ionicons 
-              name={formData.completionVerified ? "checkmark-circle" : "help-circle"} 
+              name={formData.completionVerified ? "shield-checkmark" : "shield-outline"} 
               size={16} 
               color={formData.completionVerified ? "#28a745" : "#ffc107"} 
             />
-            <Text style={styles.completionInfoText}>
-              Verification: {formData.completionVerified ? "Verified" : "Pending"}
+            <Text style={[
+              styles.completionInfoText,
+              { color: formData.completionVerified ? "#28a745" : "#ffc107" }
+            ]}>
+              Verification: {formData.completionVerified ? "✓ Verified" : "⏳ Pending"}
+            </Text>
+          </View>
+          
+          <View style={styles.completionInfoRow}>
+            <Ionicons 
+              name={formData.imageProof ? "image" : "image-outline"} 
+              size={16} 
+              color={formData.imageProof ? "#315342" : "#999"} 
+            />
+            <Text style={[
+              styles.completionInfoText,
+              { color: formData.imageProof ? "#315342" : "#999" }
+            ]}>
+              Image Proof: {formData.imageProof ? "Available" : "Not Provided"}
             </Text>
           </View>
         </View>
@@ -672,6 +789,9 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
             </TouchableOpacity>
           </View>
 
+          {/* NEW: Verification Status Button - Shows at top if image proof exists */}
+          <VerificationStatusButton />
+
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {/* Task Type */}
             <CustomDropdown
@@ -797,15 +917,39 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
               </TouchableOpacity>
             </View>
 
-            {/* Status */}
-            <CustomDropdown
-              title="Status"
-              value={formData.status}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
-              options={statusOptions}
-              placeholder="Select status"
-              fieldKey="status"
-            />
+            {/* Status - Show as read-only if controlled by verification */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Status</Text>
+              {formData.imageProof ? (
+                <View style={styles.statusReadOnlyContainer}>
+                  <View style={styles.statusReadOnlyContent}>
+                    <Ionicons 
+                      name={formData.status === 'Completed' ? "checkmark-circle" : "time"} 
+                      size={20} 
+                      color={formData.status === 'Completed' ? "#28a745" : "#ffc107"} 
+                    />
+                    <Text style={[
+                      styles.statusReadOnlyText,
+                      { color: formData.status === 'Completed' ? "#28a745" : "#ffc107" }
+                    ]}>
+                      {formData.status}
+                    </Text>
+                  </View>
+                  <Text style={styles.statusReadOnlyNote}>
+                    Status is automatically controlled by verification
+                  </Text>
+                </View>
+              ) : (
+                <CustomDropdown
+                  title=""
+                  value={formData.status}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                  options={statusOptions}
+                  placeholder="Select status"
+                  fieldKey="status"
+                />
+              )}
+            </View>
 
             {/* Image Proof Section */}
             <ImageProofSection />
@@ -935,42 +1079,35 @@ const TaskModal = ({ showTaskModal, setShowTaskModal, setEditingTask, editingTas
   );
 };
 
+// Enhanced StyleSheet with new styles
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    paddingTop: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight,
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-    minHeight: '60%',
-  },
-  loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#315342',
-    fontWeight: '500',
+  modalContainer: {
+    width: width * 0.95,
+    height: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    flexDirection: 'column',
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    justifyContent: 'space-between',
+    padding: 20,
+    paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#f0f0f0',
+    minHeight: 60,
   },
   modalTitle: {
     fontSize: 20,
@@ -978,12 +1115,12 @@ const styles = StyleSheet.create({
     color: '#315342',
   },
   closeButton: {
-    padding: 4,
+    padding: 5,
   },
   modalContent: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    padding: 20,
+    minHeight: 0,
   },
   formGroup: {
     marginBottom: 20,
@@ -994,200 +1131,140 @@ const styles = StyleSheet.create({
     color: '#315342',
     marginBottom: 8,
   },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  
+  // NEW: Verification Status Button Styles
+  verificationStatusContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
     backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  switchLabel: {
-    flex: 1,
-    fontSize: 16,
-    color: '#315342',
-    marginLeft: 12,
-  },
-  dropdownButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  dropdownButtonOpen: {
-    borderColor: '#315342',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  dropdownButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  dropdownIcon: {
-    marginRight: 12,
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: '#315342',
-  },
-  placeholderText: {
-    color: '#999',
-  },
-  dropdownList: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#315342',
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    maxHeight: 200,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  dropdownScrollView: {
-    maxHeight: 200,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#e9ecef',
   },
-  dropdownItemSelected: {
-    backgroundColor: '#f0f8f4',
-  },
-  dropdownItemIcon: {
-    marginRight: 12,
-  },
-  dropdownItemText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-  },
-  dropdownItemTextSelected: {
-    color: '#315342',
-    fontWeight: '500',
-  },
-  datePickerButton: {
+  verificationStatusButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 2,
   },
-  datePickerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  verifiedButton: {
+    backgroundColor: '#e8f5e8',
+    borderColor: '#28a745',
+  },
+  unverifiedButton: {
+    backgroundColor: '#fff8e1',
+    borderColor: '#ffc107',
+  },
+  verificationStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
     flex: 1,
+    marginHorizontal: 12,
   },
-  dateIcon: {
-    marginRight: 12,
+  verifiedButtonText: {
+    color: '#28a745',
   },
-  dateText: {
-    fontSize: 16,
-    color: '#315342',
+  unverifiedButtonText: {
+    color: '#ffc107',
   },
-  timeSlotContainer: {
+
+  // Enhanced Verification Container Styles
+  verificationContainer: {
+    marginTop: 12,
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  verificationToggle: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  timeInputContainer: {
-    flex: 1,
-  },
-  timePickerContainer: {
-    flex: 1,
-  },
-  timePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  timePickerContent: {
+  verificationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  timeIcon: {
-    marginRight: 12,
-  },
-  timeText: {
+  verificationLabel: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#315342',
-  },
-  removeTimeButton: {
-    marginLeft: 12,
-    padding: 4,
-  },
-  addTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f0f8f4',
-    borderWidth: 1,
-    borderColor: '#315342',
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  addTimeText: {
-    fontSize: 16,
-    color: '#315342',
-    fontWeight: '500',
     marginLeft: 8,
   },
-  warningContainer: {
+  verificationSwitch: {
+    transform: [{ scaleX: 1.1 }, { scaleY: 1.1 }],
+  },
+  verificationStatusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3cd',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ffeaa7',
-    marginBottom: 20,
+    marginBottom: 8,
   },
-  warningText: {
-    flex: 1,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  verificationDescription: {
     fontSize: 14,
-    color: '#856404',
-    marginLeft: 12,
+    fontWeight: '500',
+    flex: 1,
   },
-  // Image Proof Styles
+  verificationNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    lineHeight: 16,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+
+  // Status Read-Only Styles
+  statusReadOnlyContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    padding: 12,
+  },
+  statusReadOnlyContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  statusReadOnlyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  statusReadOnlyNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+
+  // Enhanced Image Proof Styles
   imageProofContainer: {
     flexDirection: 'row',
     backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   imageProofThumbnail: {
     width: 80,
     height: 80,
     borderRadius: 8,
     overflow: 'hidden',
+    marginRight: 12,
     position: 'relative',
   },
   thumbnailImage: {
@@ -1206,8 +1283,6 @@ const styles = StyleSheet.create({
   },
   imageProofInfo: {
     flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
   },
   imageProofHeader: {
     flexDirection: 'row',
@@ -1215,82 +1290,282 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   imageProofLabel: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#315342',
-    marginLeft: 8,
+    marginLeft: 6,
     flex: 1,
   },
   imageProofText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
+    marginBottom: 8,
   },
   noImageProofContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
+    padding: 20,
     backgroundColor: '#f8f9fa',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    paddingVertical: 24,
+    borderColor: '#e9ecef',
   },
   noImageProofText: {
     fontSize: 14,
     color: '#999',
     marginTop: 8,
+    textAlign: 'center',
   },
+  noVerificationNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
   // Completion Info Styles
   completionInfoContainer: {
     backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
     padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   completionInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    paddingVertical: 4,
   },
   completionInfoText: {
     fontSize: 14,
-    color: '#315342',
+    color: '#333',
     marginLeft: 8,
     flex: 1,
   },
+
+  // Existing styles (dropdown, buttons, etc.)
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  dropdownButtonOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomColor: 'transparent',
+  },
+  dropdownButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dropdownIcon: {
+    marginRight: 8,
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  placeholderText: {
+    color: '#999',
+  },
+  dropdownList: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    backgroundColor: '#fff',
+    maxHeight: 200,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#f0f8ff',
+  },
+  dropdownItemIcon: {
+    marginRight: 8,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  dropdownItemTextSelected: {
+    color: '#315342',
+    fontWeight: '600',
+  },
+  
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  datePickerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dateIcon: {
+    marginRight: 8,
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  
+  timeSlotContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  timeInputContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  timePickerContainer: {
+    flex: 1,
+  },
+  timePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  timePickerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  timeIcon: {
+    marginRight: 8,
+  },
+  timeText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  removeTimeButton: {
+    padding: 5,
+  },
+  addTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#315342',
+    borderStyle: 'dashed',
+    marginTop: 5,
+  },
+  addTimeText: {
+    fontSize: 14,
+    color: '#315342',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#315342',
+    flex: 1,
+    marginLeft: 8,
+  },
+  
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff8e1',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffc107',
+    marginBottom: 15,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#ffc107',
+    marginLeft: 8,
+    flex: 1,
+  },
+  
   modalFooter: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 15,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    gap: 12,
+    borderTopColor: '#f0f0f0',
   },
   button: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelButton: {
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#dee2e6',
+    marginRight: 10,
   },
   cancelButtonText: {
     fontSize: 16,
+    color: '#6c757d',
     fontWeight: '600',
-    color: '#666',
   },
   submitButton: {
     backgroundColor: '#315342',
+    marginLeft: 10,
   },
   submitButtonText: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#fff',
+    fontWeight: '600',
   },
+  
+  loadingContainer: {
+    backgroundColor: '#fff',
+    padding: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#315342',
+    marginTop: 10,
+  },
+  
   // Picker Modal Styles
   pickerModalOverlay: {
     flex: 1,
@@ -1300,18 +1575,16 @@ const styles = StyleSheet.create({
   },
   pickerModalContent: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    width: width * 0.85,
+    borderRadius: 12,
+    padding: 20,
+    width: width * 0.8,
     maxHeight: '70%',
   },
   pickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    marginBottom: 20,
   },
   pickerTitle: {
     fontSize: 18,
@@ -1320,62 +1593,62 @@ const styles = StyleSheet.create({
   },
   dateInput: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    margin: 20,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
-    color: '#315342',
+    color: '#333',
+    marginBottom: 20,
   },
   pickerConfirmButton: {
     backgroundColor: '#315342',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
   pickerConfirmText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
   },
   timeOptionsList: {
     maxHeight: 300,
   },
   timeOption: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   timeOptionText: {
     fontSize: 16,
-    color: '#315342',
+    color: '#333',
   },
+  
   // Image Modal Styles
   imageModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   imageModalCloseArea: {
     flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   imageModalContent: {
-    flex: 1,
-    justifyContent: 'center',
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: 'transparent',
   },
   imageModalHeader: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    zIndex: 1,
+    marginBottom: 20,
+    paddingHorizontal: 10,
   },
   imageModalTitle: {
     fontSize: 18,
@@ -1384,26 +1657,20 @@ const styles = StyleSheet.create({
   },
   fullSizeImage: {
     width: '100%',
-    height: '70%',
+    height: 400,
+    borderRadius: 8,
   },
   imageModalFooter: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 60 : 40,
-    left: 0,
-    right: 0,
+    marginTop: 20,
     alignItems: 'center',
   },
   imageModalInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
   },
   imageModalInfoText: {
-    fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
     marginLeft: 8,
   },
 });

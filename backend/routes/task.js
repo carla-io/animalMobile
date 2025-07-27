@@ -16,7 +16,8 @@ router.post('/add', async (req, res) => {
       isRecurring,
       recurrencePattern,
       endDate,
-      status
+      status,
+      completionVerified // ✅ Add this field
     } = req.body;
 
     // Validate required fields for recurring tasks
@@ -32,6 +33,11 @@ router.post('/add', async (req, res) => {
       }
     }
 
+    // Validate completionVerified logic
+    if (completionVerified && (!status || status !== 'Completed')) {
+      return res.status(400).json({ error: 'Tasks can only be verified as completed if status is "Completed".' });
+    }
+
     const task = new Task({
       type,
       assignedTo,
@@ -41,7 +47,8 @@ router.post('/add', async (req, res) => {
       isRecurring,
       recurrencePattern,
       endDate,
-      status: status || 'Pending'
+      status: status || 'Pending',
+      completionVerified: completionVerified || false // ✅ Add this field (defaults to false)
     });
 
     await task.save();
@@ -194,9 +201,12 @@ router.put('/edit/:id', async (req, res) => {
       isRecurring,
       recurrencePattern,
       endDate,
-      status
+      status,
+      completionVerified, // ✅ Add this field
+      imageProof // ✅ Add this field
     } = req.body;
 
+    // Validate required fields for recurring tasks
     if (isRecurring) {
       if (!scheduleDate) {
         return res.status(400).json({ error: 'Recurring tasks require a start date (scheduleDate).' });
@@ -209,6 +219,26 @@ router.put('/edit/:id', async (req, res) => {
       }
     }
 
+    // Validate completion verification logic
+    if (completionVerified === true) {
+      if (!imageProof && status !== 'Completed') {
+        return res.status(400).json({ 
+          error: 'Tasks can only be verified as completed if they have image proof and status is "Completed".' 
+        });
+      }
+      if (status !== 'Completed') {
+        return res.status(400).json({ 
+          error: 'Tasks can only be verified if status is "Completed".' 
+        });
+      }
+    }
+
+    // Get the current task to preserve existing data
+    const currentTask = await Task.findById(req.params.id);
+    if (!currentTask) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
     const updatedData = {
       type,
       assignedTo,
@@ -219,14 +249,19 @@ router.put('/edit/:id', async (req, res) => {
       recurrencePattern,
       endDate,
       status,
-      completedAt: status === 'Completed' ? new Date() : null
+      // Handle completedAt: set to current time if status changes to Completed, preserve existing if already completed
+      completedAt: status === 'Completed' 
+        ? (currentTask.completedAt || new Date()) 
+        : null,
+      // Handle completionVerified: only allow true if task is completed and has image proof
+      completionVerified: (status === 'Completed' && (imageProof || currentTask.imageProof)) 
+        ? (completionVerified !== undefined ? completionVerified : currentTask.completionVerified)
+        : false,
+      // Handle imageProof: update if provided, otherwise preserve existing
+      imageProof: imageProof !== undefined ? imageProof : currentTask.imageProof
     };
 
     const updatedTask = await Task.findByIdAndUpdate(req.params.id, updatedData, { new: true });
-
-    if (!updatedTask) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
 
     res.status(200).json(updatedTask);
   } catch (error) {
