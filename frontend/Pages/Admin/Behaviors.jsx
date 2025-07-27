@@ -42,32 +42,39 @@ const AllBehaviorsScreen = ({ navigation }) => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedBehavior, setSelectedBehavior] = useState(null);
   const [seekVetModalVisible, setSeekVetModalVisible] = useState(false);
-const [selectedAnimalForVet, setSelectedAnimalForVet] = useState(null);
+  const [selectedAnimalForVet, setSelectedAnimalForVet] = useState(null);
 
   // Animation values for drawer
   const [slideAnim] = useState(new Animated.Value(-width * 0.8));
   const [overlayOpacity] = useState(new Animated.Value(0));
 
-  // Filter options - removed critical and normal
+  // Filter options - updated to show critical and normal animals
   const filterOptions = [
     { key: 'all', label: 'All' },
-    { key: 'today', label: 'Today' },
-    { key: 'week', label: 'This Week' },
+    { key: 'seekvet', label: 'Seek Vet' },
+    { key: 'normal', label: 'Normal' },
   ];
   
   // Handle opening seek vet modal
-const handleSeekVet = (behavior) => {
-  setSelectedAnimalForVet(behavior.animalId);
-  setSeekVetModalVisible(true);
-};
+  const handleSeekVet = (behavior) => {
+    setSeekVetModalVisible(true);
+    setSelectedAnimalForVet(behavior.animalId);
+  };
 
-// Handle successful vet assignment
-const handleVetAssignSuccess = (assignment) => {
-  // You can add any additional logic here, like refreshing data
-  console.log('Vet assigned successfully:', assignment);
-  // Optionally refresh behaviors list
-  fetchBehaviors();
-};
+  // Handle successful vet assignment
+  const handleVetAssignSuccess = (assignment) => {
+    console.log('Vet assigned successfully:', assignment);
+    setSeekVetModalVisible(false);
+    setSelectedAnimalForVet(null);
+    // Refresh behaviors list
+    fetchBehaviors();
+  };
+
+  const handleCloseSeekVetModal = () => {
+    setSeekVetModalVisible(false);
+    setSelectedAnimalForVet(null);
+  };
+
   // Drawer animation functions
   const openDrawer = () => {
     setDrawerVisible(true);
@@ -124,6 +131,13 @@ const handleVetAssignSuccess = (assignment) => {
     fetchBehaviors();
   }, [fetchBehaviors]);
 
+  // Check if behavior is critical
+  const isCriticalBehavior = (behavior) => {
+    return behavior.eating === 'None' || 
+           behavior.movement === 'Limping' || 
+           behavior.mood === 'Aggressive';
+  };
+
   // Filter behaviors based on search and selected filter
   const filteredBehaviors = behaviors.filter(behavior => {
     const matchesSearch = !searchText || 
@@ -131,26 +145,17 @@ const handleVetAssignSuccess = (assignment) => {
       behavior.animalId?.species?.toLowerCase().includes(searchText.toLowerCase()) ||
       behavior.notes?.toLowerCase().includes(searchText.toLowerCase());
 
-    const today = new Date();
-    const behaviorDate = new Date(behavior.createdAt);
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const isCritical = isCriticalBehavior(behavior);
 
     switch (selectedFilter) {
-      case 'today':
-        return matchesSearch && behaviorDate.toDateString() === today.toDateString();
-      case 'week':
-        return matchesSearch && behaviorDate >= weekAgo;
+      case 'seekvet':
+        return matchesSearch && isCritical;
+      case 'normal':
+        return matchesSearch && !isCritical;
       default:
         return matchesSearch;
     }
   });
-
-  // Check if behavior is critical
-  const isCriticalBehavior = (behavior) => {
-    return behavior.eating === 'None' || 
-           behavior.movement === 'Limping' || 
-           behavior.mood === 'Aggressive';
-  };
 
   // Get status badge color
   const getStatusBadgeStyle = (behavior) => {
@@ -229,38 +234,38 @@ const handleVetAssignSuccess = (assignment) => {
         )}
       </View>
 
-     <View style={styles.behaviorFooter}>
-  <View style={styles.timeInfo}>
-    <Clock size={14} color="#718096" />
-    <Text style={styles.timeText}>
-      {formatDate(behavior.createdAt)}
-    </Text>
-  </View>
+      <View style={styles.behaviorFooter}>
+        <View style={styles.timeInfo}>
+          <Clock size={14} color="#718096" />
+          <Text style={styles.timeText}>
+            {formatDate(behavior.createdAt)}
+          </Text>
+        </View>
 
-  <View style={styles.footerButtons}>
-    {/* Show Seek Vet button for critical behaviors */}
-    {isCriticalBehavior(behavior) && (
-      <TouchableOpacity
-        style={styles.seekVetButton}
-        onPress={() => handleSeekVet(behavior)}
-      >
-        <AlertTriangle size={16} color="#e53e3e" />
-        <Text style={styles.seekVetButtonText}>Seek Vet</Text>
-      </TouchableOpacity>
-    )}
-    
-    <TouchableOpacity
-      style={styles.viewButton}
-      onPress={() => {
-        setSelectedBehavior(behavior);
-        setDetailModalVisible(true);
-      }}
-    >
-      <Eye size={16} color="#315342" />
-      <Text style={styles.viewButtonText}>View Details</Text>
-    </TouchableOpacity>
-  </View>
-</View>
+        <View style={styles.footerButtons}>
+          {/* Show Seek Vet button for critical behaviors */}
+          {isCriticalBehavior(behavior) && (
+            <TouchableOpacity
+              style={styles.seekVetButton}
+              onPress={() => handleSeekVet(behavior)}
+            >
+              <AlertTriangle size={16} color="#e53e3e" />
+              <Text style={styles.seekVetButtonText}>Seek Vet</Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity
+            style={styles.viewButton}
+            onPress={() => {
+              setSelectedBehavior(behavior);
+              setDetailModalVisible(true);
+            }}
+          >
+            <Eye size={16} color="#315342" />
+            <Text style={styles.viewButtonText}>View Details</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 
@@ -434,7 +439,9 @@ const handleVetAssignSuccess = (assignment) => {
               key={option.key}
               style={[
                 styles.filterButton,
-                selectedFilter === option.key && styles.filterButtonActive
+                selectedFilter === option.key && styles.filterButtonActive,
+                // Add special styling for critical filter
+                option.key === 'seekvet' && selectedFilter === option.key && styles.filterButtonCritical
               ]}
               onPress={() => setSelectedFilter(option.key)}
             >
@@ -516,20 +523,18 @@ const handleVetAssignSuccess = (assignment) => {
         </View>
       )}
 
-      
-  {/* Seek Vet Modal */}
-<SeekVetModal
-  visible={seekVetModalVisible}
-  onClose={() => setSeekVetModalVisible(false)}
-  selectedAnimal={selectedAnimalForVet}
-  onAssignSuccess={handleVetAssignSuccess}
-/>
+      {/* Seek Vet Modal */}
+      <SeekVetModal
+        visible={seekVetModalVisible}
+        onClose={handleCloseSeekVetModal}
+        selectedAnimal={selectedAnimalForVet}
+        onAssignSuccess={handleVetAssignSuccess}
+      />
 
       {/* Detail Modal */}
       {renderDetailModal()}
     </SafeAreaView>
   );
-
 };
 
 const styles = StyleSheet.create({
@@ -655,6 +660,12 @@ const styles = StyleSheet.create({
     borderColor: '#315342',
     shadowColor: '#315342',
     shadowOpacity: 0.2,
+  },
+  filterButtonCritical: {
+    backgroundColor: '#e53e3e',
+    borderColor: '#e53e3e',
+    shadowColor: '#e53e3e',
+    shadowOpacity: 0.3,
   },
   filterButtonText: {
     fontSize: 14,
@@ -938,27 +949,27 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   footerButtons: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
-},
-seekVetButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  borderRadius: 8,
-  backgroundColor: '#fef5e7',
-  borderWidth: 1,
-  borderColor: '#e53e3e',
-  marginRight: 8,
-},
-seekVetButtonText: {
-  fontSize: 12,
-  color: '#e53e3e',
-  marginLeft: 4,
-  fontWeight: '600',
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  seekVetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#fef5e7',
+    borderWidth: 1,
+    borderColor: '#e53e3e',
+    marginRight: 8,
+  },
+  seekVetButtonText: {
+    fontSize: 12,
+    color: '#e53e3e',
+    marginLeft: 4,
+    fontWeight: '600',
+  },
 });
 
 export default AllBehaviorsScreen;
