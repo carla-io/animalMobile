@@ -333,6 +333,52 @@ router.get('/assigned-vet/:animalId', async (req, res) => {
 });
 
 
+router.get('/vet/:vetId/assigned-animals', async (req, res) => {
+  const { vetId } = req.params;
+
+  try {
+    console.log('Fetching animals assigned to vet:', vetId);
+
+    // Validate vet exists and is a vet
+    const vet = await User.findOne({ _id: vetId, userType: 'vet' });
+    if (!vet) {
+      return res.status(404).json({
+        success: false,
+        message: 'Veterinarian not found.'
+      });
+    }
+
+    // Find animals assigned to this vet
+    const animals = await Animal.find({ vetId }).select(
+      '_id name species breed age assignmentReason assignedAt'
+    );
+
+    if (!animals.length) {
+      return res.status(200).json({
+        success: true,
+        message: 'No animals currently assigned to this veterinarian.',
+        animals: []
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      vet: {
+        _id: vet._id,
+        name: vet.name,
+        email: vet.email
+      },
+      assignedAnimals: animals
+    });
+
+  } catch (error) {
+    console.error('Error fetching assigned animals:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching assigned animals.'
+    });
+  }
+});
 
 
 

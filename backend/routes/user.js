@@ -3,6 +3,7 @@ const router = express.Router();
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
 const Task = require('../models/Task');
+const Animal = require('../models/Animals');
 
 
 // GET /user/profile - Get authenticated user's profile
@@ -117,6 +118,53 @@ router.get('/getAllVetsOnly', async (req, res) => {
   }
 });
 
+router.get('/vet/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Find the vet by ID and userType
+    const vet = await User.findOne({ _id: id, userType: 'vet' }, '-password');
+
+    if (!vet) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vet not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: vet
+    });
+  } catch (error) {
+    console.error('Error fetching vet by ID:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+router.get('/vet/:id/assigned-animals', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find all animals assigned to this vet
+    const assignedAnimals = await Animal.find({ vetId: id })
+      .populate('vetId', 'name email'); // only populate vet if needed
+
+    res.status(200).json({
+      success: true,
+      animals: assignedAnimals
+    });
+  } catch (error) {
+    console.error('Error fetching assigned animals:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch assigned animals.'
+    });
+  }
+});
 
 
 module.exports = router;

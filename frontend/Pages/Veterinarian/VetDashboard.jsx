@@ -41,11 +41,11 @@ const VetDashboard = ({ navigation }) => {
   // State for fetched data
   const [animals, setAnimals] = useState([]);
   const [medicalRecords, setMedicalRecords] = useState([]);
-  const [tasks, setTasks] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [stats, setStats] = useState({
     animalCount: 0,
     recordCount: 0,
-    taskCount: 0
+    patientCount: 0
   });
 
   const fetchAnimals = async () => {
@@ -75,18 +75,70 @@ const VetDashboard = ({ navigation }) => {
     }
   };
 
-  const fetchTasks = async () => {
+  const fetchPatients = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const res = await axios.get(`${API_BASE_URL}/tasks`, {
+      
+      // Get current user info to get vet ID
+      const userRes = await axios.get(`${API_BASE_URL}/user/profile`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const tasksData = res.data || [];
-      setTasks(tasksData);
-      setStats(prev => ({...prev, taskCount: tasksData.length}));
+      
+      console.log('User response:', userRes.data);
+      
+      const vetId = userRes.data.user?.id || userRes.data.user?._id;
+      
+      if (!vetId) {
+        console.error('Vet ID not found in user profile:', userRes.data);
+        showToast('error', 'Error', 'Unable to identify veterinarian');
+        return;
+      }
+
+      console.log('Using vet ID:', vetId);
+
+      // Fetch assigned animals that need medical attention
+      const patientsRes = await axios.get(`${API_BASE_URL}/user/vet/${vetId}/assigned-animals`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      console.log('Patients response:', patientsRes.data);
+
+      // Fix: Use the correct path from your API response
+      const patientsData = patientsRes.data.animals || [];
+      
+      console.log('Patients data:', patientsData);
+      
+      // Filter animals that need medical attention (status: needs_attention)
+      const animalsNeedingAttention = patientsData.filter(animal => {
+        console.log(`Animal ${animal.name} status:`, animal.status);
+        return animal.status === 'needs_attention';
+      });
+      
+      console.log('Animals needing attention:', animalsNeedingAttention);
+      
+      // Process the data to add additional checkup information
+      const processedPatients = animalsNeedingAttention.map(animal => ({
+        ...animal,
+        checkupReason: animal.assignmentReason || 'Medical attention required',
+        lastCheckup: animal.lastCheckup || null,
+        urgencyLevel: 'high', // Since they need attention
+        assignedDate: animal.assignedAt
+      }));
+
+      console.log('Processed patients:', processedPatients);
+
+      setPatients(processedPatients);
+      setStats(prev => ({...prev, patientCount: processedPatients.length}));
+      
+      console.log('Updated patients state with count:', processedPatients.length);
     } catch (error) {
-      console.error('Error fetching tasks:', error);
-      showToast('error', 'Error', 'Failed to fetch tasks');
+      console.error('Error fetching patients:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      showToast('error', 'Error', 'Failed to fetch patients');
+      
+      // Set empty patients array on error
+      setPatients([]);
+      setStats(prev => ({...prev, patientCount: 0}));
     }
   };
 
@@ -96,7 +148,7 @@ const VetDashboard = ({ navigation }) => {
       await Promise.all([
         fetchAnimals(),
         fetchMedicalRecords(),
-        fetchTasks()
+        fetchPatients()
       ]);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -199,20 +251,29 @@ const VetDashboard = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const renderTaskItem = ({ item }) => (
+  const renderPatientItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.taskItem}
-      onPress={() => navigation.navigate('TaskDetail', { taskId: item._id })}
+      style={styles.patientItem}
+      onPress={() => navigation.navigate('AnimalProfiles', { animalId: item._id })}
       activeOpacity={0.8}
     >
-      <View style={[styles.taskPriority, { backgroundColor: getPriorityColor(item.priority) }]} />
-      <View style={styles.taskInfo}>
-        <Text style={styles.taskTitle}>{item.type} for {item.animal?.name || 'Animal'}</Text>
-        <Text style={styles.taskDueDate}>Due: {formatDate(item.scheduleDate)}</Text>
-        <View style={styles.taskStatusContainer}>
-          <Text style={styles.taskStatus}>{item.status}</Text>
-        </View>
+      <View style={styles.patientUrgency}>
+        <Ionicons name="medical" size={20} color="#FF6347" />
       </View>
+      <Image 
+        source={{ uri: item.photo || `${API_BASE_URL}/default-profile.png` }} 
+        style={styles.patientImage}
+        defaultSource={{ uri: `${API_BASE_URL}/default-profile.png` }}
+      />
+      <View style={styles.patientInfo}>
+        <Text style={styles.patientName}>{item.name}</Text>
+        <Text style={styles.patientDetails}>{item.species} • {item.breed || 'Unknown'}</Text>
+        <Text style={styles.checkupReason}>{item.checkupReason}</Text>
+        {item.lastCheckup && (
+          <Text style={styles.lastCheckup}>Last checkup: {formatDate(item.lastCheckup)}</Text>
+        )}
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#a4d9ab" />
     </TouchableOpacity>
   );
 
@@ -239,15 +300,6 @@ const VetDashboard = ({ navigation }) => {
       case 'treatment': return 'bandage-outline';
       case 'surgery': return 'medkit-outline';
       default: return 'document-text-outline';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch(priority?.toLowerCase()) {
-      case 'high': return '#FF6347';
-      case 'medium': return '#FFD700';
-      case 'low': return '#a4d9ab';
-      default: return '#a4d9ab';
     }
   };
 
@@ -316,9 +368,9 @@ const VetDashboard = ({ navigation }) => {
             <Text style={styles.statLabel}>Records</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="checkmark-circle" size={24} color="#315342" />
-            <Text style={styles.statNumber}>{stats.taskCount}</Text>
-            <Text style={styles.statLabel}>Tasks</Text>
+            <Ionicons name="medical" size={24} color="#315342" />
+            <Text style={styles.statNumber}>{stats.patientCount}</Text>
+            <Text style={styles.statLabel}>Patients</Text>
           </View>
         </View>
 
@@ -337,10 +389,10 @@ const VetDashboard = ({ navigation }) => {
             <Text style={[styles.tabText, activeTab === 'records' && styles.activeTabText]}>Records</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.tabButton, activeTab === 'tasks' && styles.activeTab]}
-            onPress={() => setActiveTab('tasks')}
+            style={[styles.tabButton, activeTab === 'patients' && styles.activeTab]}
+            onPress={() => setActiveTab('patients')}
           >
-            <Text style={[styles.tabText, activeTab === 'tasks' && styles.activeTabText]}>Tasks</Text>
+            <Text style={[styles.tabText, activeTab === 'patients' && styles.activeTabText]}>Patients</Text>
           </TouchableOpacity>
         </View>
 
@@ -415,32 +467,39 @@ const VetDashboard = ({ navigation }) => {
             </View>
           )}
 
-          {/* Tasks Tab */}
-          {activeTab === 'tasks' && (
+          {/* Patients Tab */}
+          {activeTab === 'patients' && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Assigned Tasks</Text>
+                <Text style={styles.sectionTitle}>Patients Needing Checkup</Text>
                 <View style={styles.recordActions}>
-                  <TouchableOpacity onPress={() => navigation.navigate('AllTasks')}>
+                  <TouchableOpacity onPress={() => navigation.navigate('AllPatients')}>
                     <Text style={styles.seeAll}>See All</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={styles.filterButton}
-                    onPress={() => navigation.navigate('FilterTasks')}
+                    onPress={() => navigation.navigate('FilterPatients')}
                   >
                     <Ionicons name="filter" size={18} color="#315342" />
                   </TouchableOpacity>
                 </View>
               </View>
               <FlatList
-                data={tasks.slice(0, 5)}
-                renderItem={renderTaskItem}
+                data={patients.slice(0, 5)}
+                renderItem={renderPatientItem}
                 keyExtractor={item => item._id}
                 scrollEnabled={false}
                 ListEmptyComponent={
-                  <Text style={styles.emptyText}>No tasks assigned</Text>
+                  <Text style={styles.emptyText}>No patients need checkup</Text>
                 }
               />
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={() => navigation.navigate('ScheduleCheckup')}
+              >
+                <Ionicons name="calendar" size={24} color="#fff" />
+                <Text style={styles.addButtonText}>Schedule Checkup</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -491,83 +550,82 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   loadingText: {
-    marginTop: 10,
-    color: '#315342',
+    marginTop: 16,
     fontSize: 16,
+    color: '#315342',
+    fontWeight: '500',
   },
   header: {
+    paddingTop: getStatusBarHeight() + 20,
     paddingBottom: 30,
-    paddingTop: getStatusBarHeight(),
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingHorizontal: 20,
   },
   headerContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    flex: 1,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   headerButton: {
     padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(164, 217, 171, 0.2)',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#a4d9ab',
+    opacity: 0.9,
   },
   quickStatsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     paddingHorizontal: 20,
-    marginTop: -15,
-    marginBottom: 20,
-  },
-  statCard: {
-    width: '30%',
+    paddingVertical: 20,
     backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
-    alignItems: 'center',
-    elevation: 3,
+    marginHorizontal: 20,
+    marginTop: -20,
+    borderRadius: 16,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+  },
+  statCard: {
+    alignItems: 'center',
+    flex: 1,
   },
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#315342',
-    marginVertical: 5,
+    marginTop: 8,
   },
   statLabel: {
     fontSize: 14,
     color: '#666',
+    marginTop: 4,
   },
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 20,
-    marginBottom: 20,
+    marginTop: 20,
     backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    padding: 5,
+    borderRadius: 12,
+    padding: 4,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
     alignItems: 'center',
+    borderRadius: 8,
   },
   activeTab: {
     backgroundColor: '#315342',
@@ -582,7 +640,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 40,
   },
   section: {
     marginBottom: 30,
@@ -591,11 +648,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
-  },
-  recordActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
@@ -603,22 +656,25 @@ const styles = StyleSheet.create({
     color: '#315342',
   },
   seeAll: {
+    fontSize: 16,
     color: '#315342',
     fontWeight: '600',
-    marginRight: 10,
+  },
+  recordActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   filterButton: {
-    padding: 5,
-    borderRadius: 20,
-    backgroundColor: 'rgba(164, 217, 171, 0.2)',
+    padding: 8,
   },
   animalItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
+    padding: 16,
+    marginBottom: 12,
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -629,8 +685,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    marginRight: 15,
-    backgroundColor: '#f0f0f0',
+    marginRight: 16,
   },
   animalInfo: {
     flex: 1,
@@ -639,19 +694,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#315342',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   animalDetails: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   statusBadge: {
-    alignSelf: 'flex-start',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    marginTop: 5,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 8,
   },
   statusText: {
     fontSize: 12,
@@ -662,9 +717,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
+    padding: 16,
+    marginBottom: 12,
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -672,13 +727,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   recordIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f0f8f2',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(164, 217, 171, 0.2)',
-    marginRight: 15,
+    marginRight: 16,
   },
   recordInfo: {
     flex: 1,
@@ -687,90 +742,91 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#315342',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   recordDate: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 2,
   },
   recordNotes: {
     fontSize: 14,
     color: '#888',
   },
-  taskItem: {
+  patientItem: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
+    padding: 16,
+    marginBottom: 12,
     borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 10,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF6347',
   },
-  taskPriority: {
-    width: 8,
+  patientUrgency: {
+    marginRight: 12,
   },
-  taskInfo: {
+  patientImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 16,
+  },
+  patientInfo: {
     flex: 1,
-    padding: 15,
   },
-  taskTitle: {
+  patientName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#315342',
-    marginBottom: 5,
+    marginBottom: 4,
   },
-  taskDueDate: {
+  patientDetails: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 4,
   },
-  taskStatusContainer: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(164, 217, 171, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+  checkupReason: {
+    fontSize: 14,
+    color: '#FF6347',
+    fontWeight: '500',
+    marginBottom: 2,
   },
-  taskStatus: {
+  lastCheckup: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#315342',
+    color: '#888',
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#315342',
+    padding: 16,
     borderRadius: 12,
-    padding: 15,
-    marginTop: 10,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginTop: 16,
   },
   addButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 10,
+    marginLeft: 8,
   },
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
+    gap: 16,
   },
   quickActionButton: {
-    width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
+    flex: 1,
     alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -781,35 +837,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#315342',
-    marginTop: 10,
+    marginTop: 8,
     textAlign: 'center',
   },
   emptyText: {
     textAlign: 'center',
-    color: '#666',
-    marginTop: 20,
     fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
+    paddingVertical: 20,
   },
   modalContainer: {
     flex: 1,
-    flexDirection: 'row',
-  },
-  drawerContainer: {
-    width: width * 0.8,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
   },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  drawerContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: width * 0.8,
   },
 });
 
