@@ -90,7 +90,9 @@ router.get('/:id', async (req, res) => {
 router.put('/update/:id', upload.single('photo'), async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = { ...req.body };
+
+    const { vetId, assignmentReason, assignedAt, ...filteredBody } = req.body; // ❌ remove vet fields
+    const updateData = { ...filteredBody };
 
     if (req.file) {
       updateData.photo = req.file.path;
@@ -108,6 +110,7 @@ router.put('/update/:id', upload.single('photo'), async (req, res) => {
     res.status(400).json({ success: false, message: 'Failed to update animal', error: err.message });
   }
 });
+
 
 // ✅ Delete animal
 router.delete('/delete/:id', async (req, res) => {
