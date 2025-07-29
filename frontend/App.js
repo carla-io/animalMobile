@@ -7,7 +7,7 @@ import Toast from 'react-native-toast-message';
 import { toastConfig } from './utils/toast';
 import Login from './Pages/Auth/Login';
 import Register from './Pages/Auth/Register';
-import Home from './Pages/Home';
+import Home from './Pages/Home'
 import CustomDrawer from './Pages/CustomDrawer';
 import ViewAssignedTasks from './Pages/Task/ViewAssignedTasks';
 import ViewAnimalProfile from './Pages/AnimalProf/viewAnimalProfile';
@@ -26,7 +26,7 @@ import Treatments from './Pages/Veterinarian/Treatments'
 import VaccinationRecords from './Pages/Veterinarian/VaccinationRecords'
 import MedicalHistory from './Pages/Veterinarian/MedicalHistory'
 import Behavior from './Pages/Admin/Behaviors';
-
+import AnimalCheckups from './Pages/AnimalProf/AnimalCheckup'; // New import
 const Stack = createStackNavigator();
 
 const theme = {
@@ -63,7 +63,7 @@ export default function App() {
             component={Home} 
             options={{ headerShown: false }} 
           />
-          <Stack.Screen
+         <Stack.Screen
             name="AssignedTasks"
             component={ViewAssignedTasks}
             options={{ headerShown: false }} 
@@ -91,6 +91,11 @@ export default function App() {
           <Stack.Screen
             name="AnimalDetailView" 
             component={AnimalDetailView}
+            options={{ headerShown: false }}
+          />
+           <Stack.Screen
+            name="AnimalCheckups"
+            component={AnimalCheckups}
             options={{ headerShown: false }}
           />
           
@@ -153,11 +158,11 @@ export default function App() {
               component={VaccinationRecords}
               options={{ headerShown: false }}
             />
-            <Stack.Screen
+            {/* <Stack.Screen
               name="MedicalHistory"
               component={MedicalHistory}
               options={{ headerShown: false }}
-            />
+            /> */}
             {/* <Stack.Screen
               name="HealthReports"
               component={HealthReports}

@@ -26,9 +26,10 @@ const CustomDrawer = ({ navigation, onClose }) => {
 
   // Regular user menu items
   const userMenuItems = [
-       { id: '1', title: 'View Assigned Tasks', icon: 'clipboard-outline', route: 'AssignedTasks' },
+     { id: '1', title: 'View Assigned Tasks', icon: 'clipboard-outline', route: 'AssignedTasks' },
      { id: '2', title: 'Input Daily Animal Behavior', icon: 'create-outline', route: 'AddBehavior' },
      { id: '3', title: 'View Animal', icon: 'paw-outline', route: 'AnimalView' },
+      // { id: '4', title: 'Checkups', icon: 'medkit-outline', route: 'AnimalCheckups' },
   ];
 
   // Admin menu items
@@ -48,19 +49,19 @@ const CustomDrawer = ({ navigation, onClose }) => {
     { id: '1', title: 'Animal Health Dashboard', icon: 'heart-outline', route: 'VetDashboard' },
     { id: '2', title: 'Animal Profiles', icon: 'paw-outline', route: 'AnimalProfiles' },
     { id: '3', title: 'Medical Checkups', icon: 'medkit-outline', route: 'MedicalCheckups' },
-    { id: '4', title: 'Treatments & Medications', icon: 'medical-outline', route: 'Treatments' },
-    { id: '5', title: 'Vaccination Records', icon: 'shield-checkmark-outline', route: 'VaccinationRecords' },
-    { id: '6', title: 'Medical History', icon: 'time-outline', route: 'MedicalHistory' },
-    { id: '7', title: 'Health Reports', icon: 'document-text-outline', route: 'HealthReports' },
-    { id: '8', title: 'Emergency Cases', icon: 'warning-outline', route: 'EmergencyCases' },
-    { id: '9', title: 'Search Medical Records', icon: 'search-outline', route: 'SearchMedicalRecords' },
-    { id: '10', title: 'Assigned Health Tasks', icon: 'clipboard-outline', route: 'AssignedHealthTasks' },
+    // { id: '4', title: 'Treatments & Medications', icon: 'medical-outline', route: 'Treatments' },
+    // { id: '5', title: 'Vaccination Records', icon: 'shield-checkmark-outline', route: 'VaccinationRecords' },
+    // { id: '6', title: 'Medical History', icon: 'time-outline', route: 'MedicalHistory' },
+    // { id: '7', title: 'Health Reports', icon: 'document-text-outline', route: 'HealthReports' },
+    // { id: '8', title: 'Emergency Cases', icon: 'warning-outline', route: 'EmergencyCases' },
+    // { id: '9', title: 'Search Medical Records', icon: 'search-outline', route: 'SearchMedicalRecords' },
+    // { id: '10', title: 'Assigned Health Tasks', icon: 'clipboard-outline', route: 'AssignedHealthTasks' },
   ];
 
   const bottomItems = [
-    { id: '9', title: 'Settings', icon: 'settings-outline', route: 'Settings' },
-    { id: '10', title: 'Help & Support', icon: 'help-circle-outline', route: 'Support' },
-    { id: '11', title: 'About', icon: 'information-circle-outline', route: 'About' },
+    // { id: '9', title: 'Settings', icon: 'settings-outline', route: 'Settings' },
+    // { id: '10', title: 'Help & Support', icon: 'help-circle-outline', route: 'Support' },
+    // { id: '11', title: 'About', icon: 'information-circle-outline', route: 'About' },
   ];
 
   const fetchProfile = async () => {
@@ -126,21 +127,22 @@ const CustomDrawer = ({ navigation, onClose }) => {
   };
 
   const performLogout = async () => {
-    try {
-      onClose?.();
-      await AsyncStorage.multiRemove(['userToken', 'userData', 'isAuthenticated', 'userType']);
-      
-      showToast('success', 'Logged Out', 'You have been successfully logged out');
-      
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-      showToast('error', 'Logout Failed', 'Something went wrong. Please try again.');
-    }
-  };
+  try {
+    // Clear all login-related data locally
+    await AsyncStorage.multiRemove(['userToken', 'userData', 'isAuthenticated']);
+
+    showToast('success', 'Logged Out', 'You have been successfully logged out');
+
+    
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    showToast('error', 'Logout Failed', 'Something went wrong. Please try again.');
+  }
+};
 
   const renderMenuItem = (item, isBottom = false) => (
     <TouchableOpacity
@@ -213,36 +215,36 @@ const CustomDrawer = ({ navigation, onClose }) => {
     }
   };
 
-  const getStats = () => {
-    switch(userType.toLowerCase()) {
-      case 'admin':
-      case 'administrator':
-        return [
-          { number: '25', label: 'Users' },
-          { number: '12', label: 'Animals' },
-          { number: '8', label: 'Vets' }
-        ];
-      case 'vet':
-      case 'veterinarian':
-      case 'doctor':
-        return [
-          { number: '42', label: 'Patients' },
-          { number: '15', label: 'Active Cases' },
-          { number: '128', label: 'Records' }
-        ];
-      default:
-        return [
-          { number: '12', label: 'Animals' },
-          { number: '8', label: 'Tasks' },
-          { number: '10', label: 'Vets' }
-        ];
-    }
-  };
+  // const getStats = () => {
+  //   switch(userType.toLowerCase()) {
+  //     case 'admin':
+  //     case 'administrator':
+  //       return [
+  //         { number: '25', label: 'Users' },
+  //         { number: '12', label: 'Animals' },
+  //         { number: '8', label: 'Vets' }
+  //       ];
+  //     case 'vet':
+  //     case 'veterinarian':
+  //     case 'doctor':
+  //       return [
+  //         { number: '42', label: 'Patients' },
+  //         { number: '15', label: 'Active Cases' },
+  //         { number: '128', label: 'Records' }
+  //       ];
+  //     default:
+  //       return [
+  //         { number: '12', label: 'Animals' },
+  //         { number: '8', label: 'Tasks' },
+  //         { number: '10', label: 'Vets' }
+  //       ];
+  //   }
+  // };
 
   const currentMenuItems = getMenuItems();
   const sectionTitle = getSectionTitle();
   const gradientColors = getGradientColors();
-  const stats = getStats();
+  // const stats = getStats();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -285,7 +287,7 @@ const CustomDrawer = ({ navigation, onClose }) => {
             </View>
           </View>
 
-          <View style={styles.statsContainer}>
+          {/* <View style={styles.statsContainer}>
             {stats.map((stat, index) => (
               <React.Fragment key={index}>
                 <View style={styles.statItem}>
@@ -295,7 +297,7 @@ const CustomDrawer = ({ navigation, onClose }) => {
                 {index < stats.length - 1 && <View style={styles.statDivider} />}
               </React.Fragment>
             ))}
-          </View>
+          </View> */}
         </LinearGradient>
 
         {/* Menu Items */}
@@ -312,7 +314,7 @@ const CustomDrawer = ({ navigation, onClose }) => {
               onPress={() => handleNavigation('SpecialOffer')}
               activeOpacity={0.8}
             >
-              <LinearGradient
+              {/* <LinearGradient
                 colors={['rgba(93, 143, 106, 0.15)', 'rgba(49, 83, 66, 0.15)']}
                 style={styles.offerGradient}
                 start={{ x: 0, y: 0 }}
@@ -326,12 +328,12 @@ const CustomDrawer = ({ navigation, onClose }) => {
                   </View>
                   <Ionicons name="arrow-forward" size={20} color="#315342" />
                 </View>
-              </LinearGradient>
+              </LinearGradient> */}
             </TouchableOpacity>
           )}
 
           {/* Veterinarian Quick Actions */}
-          {(userType.toLowerCase() === 'vet' || userType.toLowerCase() === 'veterinarian' || userType.toLowerCase() === 'doctor') && (
+          {/* {(userType.toLowerCase() === 'vet' || userType.toLowerCase() === 'veterinarian' || userType.toLowerCase() === 'doctor') && (
             <View style={styles.quickActionsContainer}>
               <Text style={styles.quickActionsTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
@@ -365,7 +367,7 @@ const CustomDrawer = ({ navigation, onClose }) => {
                 </TouchableOpacity>
               </View>
             </View>
-          )}
+          )} */}
 
           {/* Bottom Menu Items */}
           <View style={styles.bottomSection}>

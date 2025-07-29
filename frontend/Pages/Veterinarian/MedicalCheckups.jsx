@@ -22,7 +22,6 @@ import API_BASE_URL from '../../utils/api';
 import { showToast } from '../../utils/toast';
 import CustomDrawer from '../CustomDrawer';
 
-// Utility functions
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -164,6 +163,7 @@ const MedicalCheckups = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [animals, setAnimals] = useState([]);
+  const [vetId, setVetId] = useState(null);
 
   // Modal states
   const [showAnimalPicker, setShowAnimalPicker] = useState(false);
@@ -224,42 +224,150 @@ const MedicalCheckups = ({ navigation }) => {
     drawerRef.current?.openDrawer();
   };
 
-  // Fetch checkups from API
-  const fetchCheckups = async () => {
-    try {
-      setLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
-      let url = `${API_BASE_URL}/medical-records?recordType=checkup&populate=animal`;
-      
-      if (filter.animal) url += `&animal=${filter.animal}`;
-      if (filter.status) url += `&status=${filter.status}`;
-      if (filter.dateFrom) url += `&dateFrom=${filter.dateFrom.toISOString()}`;
-      if (filter.dateTo) url += `&dateTo=${filter.dateTo.toISOString()}`;
+  // Fetch vet ID
+  const fetchVetId = async () => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    const response = await axios.get(`${API_BASE_URL}/user/profile`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    const fetchedVetId = response.data.user?.id || response.data.user?._id;
+    
+    if (fetchedVetId && fetchedVetId !== 'null' && fetchedVetId !== null) {
+      console.log('Setting vetId:', fetchedVetId);
+      setVetId(fetchedVetId);
+    } else {
+      console.error('Invalid vetId received:', fetchedVetId);
+      setVetId(null);
+    }
+  } catch (error) {
+    console.error('Error fetching vet ID:', error);
+    setVetId(null);
+  }
+};
 
-      const response = await axios.get(url, {
+  // Fetch animals assigned to the vet with needs_attention status
+// Fix the fetchAssignedAnimals function to handle null vetId
+const fetchAssignedAnimals = async () => {
+  try {
+    // Don't make the request if vetId is null or undefined
+    if (!vetId) {
+      console.log('No vetId available, skipping assigned animals fetch');
+      return [];
+    }
+
+    const token = await AsyncStorage.getItem('userToken');
+    const response = await axios.get(`${API_BASE_URL}/user/vet/${vetId}/assigned-animals`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    // Filter animals that need medical attention (status: needs_attention)
+    const animalsNeedingAttention = response.data.animals.filter(animal => 
+      animal.status === 'needs_attention'
+    );
+    
+    // Process the data similar to processedPatients in the dashboard
+    const processedAnimals = animalsNeedingAttention.map(animal => ({
+      ...animal,
+      checkupReason: animal.assignmentReason || 'Medical attention required',
+      lastCheckup: animal.lastCheckup || null,
+      urgencyLevel: 'high', // Since they need attention
+      assignedDate: animal.assignedAt
+    }));
+    
+    return processedAnimals;
+  } catch (error) {
+    console.error('Error fetching assigned animals:', error);
+    return [];
+  }
+};
+
+// Fix the fetchCheckups function to wait for vetId
+const fetchCheckups = async () => {
+  try {
+    setLoading(true);
+    
+    // Don't proceed if vetId is not available
+    if (!vetId) {
+      console.log('No vetId available, cannot fetch checkups');
+      setCheckups([]);
+      return;
+    }
+
+    const token = await AsyncStorage.getItem('userToken');
+    
+    // First get the assigned animals that need attention (processed like in dashboard)
+    const assignedAnimals = await fetchAssignedAnimals();
+    
+    if (assignedAnimals.length === 0) {
+      console.log('No assigned animals found');
+      setCheckups([]);
+      return;
+    }
+    
+    // Then get checkups for these animals
+    const checkupPromises = assignedAnimals.map(animal => 
+      axios.get(`${API_BASE_URL}/medical-records?recordType=checkup&animal=${animal._id}&populate=animal,veterinarian`, {
         headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      // Ensure animal data is properly set
-      const checkupsWithAnimals = response.data.map(checkup => {
-        if (typeof checkup.animal === 'string') {
-          const animal = animals.find(a => a._id === checkup.animal);
-          return { ...checkup, animal: animal || checkup.animal };
-        }
-        return checkup;
-      });
-      
-      setCheckups(checkupsWithAnimals);
+      })
+    );
+    
+    const checkupResponses = await Promise.all(checkupPromises);
+    
+    // Combine all checkups and add the processed animal data
+    const allCheckups = checkupResponses.flatMap((response, index) => {
+      return response.data.map(checkup => ({
+        ...checkup,
+        animal: assignedAnimals[index], // Use the processed animal data
+        checkupReason: assignedAnimals[index].checkupReason,
+        urgencyLevel: assignedAnimals[index].urgencyLevel,
+        assignedDate: assignedAnimals[index].assignedDate,
+        lastCheckup: assignedAnimals[index].lastCheckup
+      }));
+    });
+    
+    setCheckups(allCheckups);
+  } catch (error) {
+    console.error('Error fetching checkups:', error);
+    showToast('error', 'Error', 'Failed to fetch medical checkups');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
+// Fix the useEffect to properly wait for vetId before fetching
+useEffect(() => {
+  const loadData = async () => {
+    try {
+      // First fetch vetId
+      await fetchVetId();
+      // Then fetch animals (this doesn't depend on vetId)
+      await fetchAnimals();
     } catch (error) {
-      console.error('Error fetching checkups:', error);
-      showToast('error', 'Error', 'Failed to fetch medical checkups');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      console.error('Error loading initial data:', error);
     }
   };
 
-  // Fetch animals from API
+  const unsubscribe = navigation.addListener('focus', loadData);
+  return unsubscribe;
+}, [navigation]);
+
+// Add a separate useEffect that runs when vetId changes
+useEffect(() => {
+  if (vetId) {
+    fetchCheckups();
+  }
+}, [vetId]);
+
+// Also fix the fetchVetId function to ensure it properly sets the vetId
+
+
+  // Fetch checkups for animals with assignmentReason
+ 
+
+  // Fetch all animals (for the animal picker)
   const fetchAnimals = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -456,38 +564,43 @@ const MedicalCheckups = ({ navigation }) => {
 
   // Load data on focus
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchAnimals();
-      fetchCheckups();
-    });
+    const loadData = async () => {
+      await fetchVetId();
+      await fetchAnimals();
+      await fetchCheckups();
+    };
+
+    const unsubscribe = navigation.addListener('focus', loadData);
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, vetId]);
 
   // Render checkup item
   const renderCheckupItem = ({ item }) => {
-    const getAnimalName = () => {
-      if (!item.animal) return 'Unknown Animal';
-      if (typeof item.animal === 'object') return item.animal.name;
-      const animal = animals.find(a => a._id === item.animal);
-      return animal ? animal.name : 'Unknown Animal';
-    };
-
     return (
       <TouchableOpacity 
         style={styles.checkupItem}
         onPress={() => openViewModal(item)}
       >
         <View style={styles.checkupHeader}>
-          <Text style={styles.animalName}>{getAnimalName()}</Text>
+          <Text style={styles.animalName}>{item.animal?.name || 'Unknown Animal'}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
             <Text style={styles.statusText}>{formatStatus(item.status)}</Text>
           </View>
         </View>
         <Text style={styles.checkupDate}>{formatDate(item.date)}</Text>
+        {item.checkupReason && (
+          <Text style={styles.checkupReason}>Reason: {item.checkupReason}</Text>
+        )}
+        {item.lastCheckup && (
+          <Text style={styles.lastCheckup}>Last checkup: {formatDate(item.lastCheckup)}</Text>
+        )}
         <Text style={styles.checkupDescription} numberOfLines={2}>{item.description}</Text>
         
         <View style={styles.checkupFooter}>
           <Text style={styles.vetName}>By: {item.veterinarian?.name || 'Unknown Vet'}</Text>
+          {item.assignedDate && (
+            <Text style={styles.assignedDate}>Assigned: {formatDate(item.assignedDate)}</Text>
+          )}
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               onPress={() => openViewModal(item)}
@@ -1071,7 +1184,6 @@ const styles = StyleSheet.create({
     borderLeftColor: '#a4d9ab',
     borderTopWidth: 1,
     borderTopColor: 'rgba(164, 217, 171, 0.3)',
-    transform: [{ scale: 1 }], // For potential animation
   },
   checkupHeader: {
     flexDirection: 'row',
@@ -1119,6 +1231,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignSelf: 'flex-start',
   },
+  checkupReason: {
+    fontSize: 14,
+    color: '#FF6347',
+    fontWeight: '500',
+    marginBottom: 4,
+    backgroundColor: 'rgba(255, 99, 71, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  lastCheckup: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
   checkupDescription: {
     fontSize: 15,
     color: '#333',
@@ -1147,6 +1276,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
+  },
+  assignedDate: {
+    fontSize: 12,
+    color: '#888',
+    fontStyle: 'italic',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -1217,7 +1351,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(49, 83, 66, 0.7)', // Using your green palette
+    backgroundColor: 'rgba(49, 83, 66, 0.7)',
   },
   pickerContainer: {
     width: '90%',

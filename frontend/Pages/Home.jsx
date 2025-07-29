@@ -1,22 +1,23 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Image,
   TouchableOpacity,
-  ScrollView,
-  FlatList,
-  Dimensions,
   Modal,
   Animated,
   StatusBar,
+  Dimensions,
   Platform,
   Easing,
 } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import CustomDrawer from './CustomDrawer';
+import API_BASE_URL from '../utils/api'; 
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,24 +27,105 @@ const getStatusBarHeight = () => {
 
 const Home = ({ navigation }) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState('');
+  const [taskStats, setTaskStats] = useState({ completed: 0, pending: 0 });
   const slideAnim = useRef(new Animated.Value(-width * 0.8)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  // const [recentLogs, setRecentLogs] = useState([]);
+  const [behaviorSummary, setBehaviorSummary] = useState([]);
+   const [chartLabels, setChartLabels] = useState([]);
+  const [chartData, setChartData] = useState([]);
 
-  // Sample data
-  const featuredItems = [
-    { id: '1', title: 'Premium Course', description: 'Learn advanced techniques', price: '$49.99', image: require('../assets/default-profile.png'), rating: 4.8 },
-    { id: '2', title: 'Beginner Workshop', description: 'Perfect for getting started', price: '$29.99', image: require('../assets/default-profile.png'), rating: 4.5 },
-    { id: '3', title: 'Master Class', description: 'Become a pro in 30 days', price: '$79.99', image: require('../assets/default-profile.png'), rating: 4.9 }
-  ];
+  useEffect(() => {
+  const loadUserAndStats = async () => {
+    try {
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (!userDataString) {
+      console.log("📦 Raw userData from AsyncStorage:", userData);
+      console.log("🆔 userId from AsyncStorage:", userData._id);
 
-  const categories = [
-    { id: '1', name: 'Development', icon: 'code' },
-    { id: '2', name: 'Design', icon: 'brush' },
-    { id: '3', name: 'Business', icon: 'briefcase' },
-    { id: '4', name: 'Marketing', icon: 'megaphone' },
-    { id: '5', name: 'Photography', icon: 'camera' },
-    { id: '6', name: 'Music', icon: 'musical-notes' }
-  ];
+        console.warn('❌ No userData found in AsyncStorage.');
+        return;
+      }
+
+      const userData = JSON.parse(userDataString);
+      setUserName(userData.name);
+      setUserId(userData._id);
+
+      // Fetch stats here after getting userId
+      const [completedRes, pendingRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/tasks/count/completed/${userData._id}`),
+        axios.get(`${API_BASE_URL}/tasks/count/pending/${userData._id}`)
+      ]);
+
+      console.log("✅ Completed count:", completedRes.data.count);
+      console.log("🕒 Pending count:", pendingRes.data.count);
+
+      setTaskStats({
+        completed: completedRes.data.count,
+        pending: pendingRes.data.count
+      });
+    } catch (error) {
+      console.error('❌ Failed to load user or stats:', error.response?.data || error.message);
+    }
+  };
+
+  loadUserAndStats();
+}, []);
+
+
+
+
+  useEffect(() => {
+  if (behaviorSummary.length === 0) {
+    setChartLabels([]);
+    setChartData([]);
+    return;
+  }
+
+  const dailyCounts = {}; // key: date string, value: counts
+
+  behaviorSummary.forEach(entry => {
+    const day = entry.date.slice(5); // MM-DD format
+
+    if (!dailyCounts[day]) {
+      dailyCounts[day] = {
+        eatingNormal: 0,
+        moodAggressive: 0,
+        movementLimping: 0,
+      };
+    }
+
+    // Add counts if exist, else 0
+    dailyCounts[day].eatingNormal += entry.eating?.Normal || 0;
+    dailyCounts[day].moodAggressive += entry.mood?.Aggressive || 0;
+    dailyCounts[day].movementLimping += entry.movement?.Limping || 0;
+  });
+
+  const labels = Object.keys(dailyCounts).sort();
+  const data = labels.map(day => dailyCounts[day]);
+
+  setChartLabels(labels);
+  setChartData(data);
+
+}, [behaviorSummary]);
+
+useEffect(() => {
+  const fetchBehaviorSummary = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/behavior/summary?range=7`);
+      console.log("📊 Behavior Summary Fetched:", res.data);
+      setBehaviorSummary(res.data.data);
+    } catch (error) {
+      console.error("❌ Failed to fetch behavior summary:", error.response?.data || error.message);
+    }
+  };
+
+  fetchBehaviorSummary();
+}, []);
+
+
 
   const openDrawer = () => {
     setDrawerVisible(true);
@@ -59,7 +141,7 @@ const Home = ({ navigation }) => {
         duration: 350,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
-      })
+      }),
     ]).start();
   };
 
@@ -76,159 +158,125 @@ const Home = ({ navigation }) => {
         duration: 250,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
-      })
+      }),
     ]).start(() => setDrawerVisible(false));
   };
-
-  const renderFeaturedItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.featuredItem}
-      onPress={() => navigation.navigate('CourseDetail', { item })}
-      activeOpacity={0.8}
-    >
-      <Image source={item.image} style={styles.featuredImage} />
-      <View style={styles.featuredInfo}>
-        <Text style={styles.featuredTitle}>{item.title}</Text>
-        <Text style={styles.featuredDescription}>{item.description}</Text>
-        <View style={styles.featuredFooter}>
-          <Text style={styles.featuredPrice}>{item.price}</Text>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderCategoryItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.categoryItem}
-      onPress={() => navigation.navigate('Category', { category: item.name })}
-      activeOpacity={0.8}
-    >
-      <View style={styles.categoryIconContainer}>
-        <Ionicons name={item.icon} size={24} color="#a4d9ab" />
-      </View>
-      <Text style={styles.categoryText}>{item.name}</Text>
-    </TouchableOpacity>
-  );
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#315342" />
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header Section */}
-        <LinearGradient
-          colors={['#315342', '#1e3a2a']}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <View style={styles.headerTop}>
-              <TouchableOpacity onPress={openDrawer} style={styles.headerButton}>
-                <Ionicons name="menu" size={28} color="#a4d9ab" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.navigate('Search')} style={styles.headerButton}>
-                <Ionicons name="search" size={28} color="#a4d9ab" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.headerTitle}>Welcome back, User!</Text>
-            <Text style={styles.headerSubtitle}>What would you like to learn today?</Text>
+      
+      {/* Header Section */}
+      <LinearGradient colors={['#315342', '#1e3a2a']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity onPress={openDrawer} style={styles.headerButton}>
+              <Ionicons name="menu" size={28} color="#a4d9ab" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Search')} style={styles.headerButton}>
+              <Ionicons name="search" size={28} color="#a4d9ab" />
+            </TouchableOpacity>
           </View>
-        </LinearGradient>
-
-        {/* Main Content */}
-        <View style={styles.content}>
-          {/* Featured Courses */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Featured Courses</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Featured')}>
-                <Text style={styles.seeAll}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={featuredItems}
-              renderItem={renderFeaturedItem}
-              keyExtractor={item => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.featuredList}
-            />
-          </View>
-
-          {/* Categories */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Categories</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Categories')}>
-                <Text style={styles.seeAll}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={categories}
-              renderItem={renderCategoryItem}
-              keyExtractor={item => item.id}
-              numColumns={3}
-              columnWrapperStyle={styles.categoryRow}
-              scrollEnabled={false}
-            />
-          </View>
-
-          {/* Popular Instructors */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Popular Instructors</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Instructors')}>
-                <Text style={styles.seeAll}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.instructorsContainer}>
-              {[1, 2, 3].map((item) => (
-                <TouchableOpacity 
-                  key={item} 
-                  style={styles.instructorCard}
-                  onPress={() => navigation.navigate('Instructor')}
-                  activeOpacity={0.8}
-                >
-                  <Image 
-                    source={require('../assets/default-profile.png')} 
-                    style={styles.instructorImage} 
-                  />
-                  <Text style={styles.instructorName}>Dr. Sarah Johnson</Text>
-                  <Text style={styles.instructorField}>Computer Science</Text>
-                  <View style={styles.ratingContainer}>
-                    <Ionicons name="star" size={14} color="#FFD700" />
-                    <Text style={styles.ratingText}>4.9</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Special Offer */}
-          <TouchableOpacity 
-            style={styles.specialOffer}
-            onPress={() => navigation.navigate('SpecialOffer')}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#315342', '#1e3a2a']}
-              style={styles.specialOfferGradient}
-            >
-              <View style={styles.specialOfferContent}>
-                <View>
-                  <Text style={styles.specialOfferTitle}>Special Offer!</Text>
-                  <Text style={styles.specialOfferText}>Get 50% off on all courses</Text>
-                </View>
-                <Ionicons name="gift" size={40} color="#a4d9ab" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            Welcome back{userName ? `, ${userName}` : ''}!
+          </Text>
+          <Text style={styles.headerSubtitle}>Let's keep your animals happy and healthy today.</Text>
         </View>
-      </ScrollView>
+      </LinearGradient>
 
-      {/* Custom Drawer */}
+      <Animated.ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.taskSummaryContainer}>
+          <Text style={styles.taskTitle}>📋 Task Overview</Text>
+          <View style={styles.taskBoxes}>
+            <View style={[styles.taskBox, { backgroundColor: '#a7f3d0' }]}>
+              <Ionicons name="checkmark-circle" size={28} color="#065f46" />
+              <Text style={styles.taskCount}>{taskStats.completed}</Text>
+              <Text style={styles.taskLabel}>Completed</Text>
+            </View>
+            <View style={[styles.taskBox, { backgroundColor: '#fde68a' }]}>
+              <Ionicons name="time" size={28} color="#92400e" />
+              <Text style={styles.taskCount}>{taskStats.pending ?? 0}</Text>
+              <Text style={styles.taskLabel}>Pending</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.behaviorSection}>
+          <Text style={styles.sectionTitle}>📊 Animal Behavior Trends (7 days)</Text>
+          {chartData.length > 0 ? (
+        <View>
+  <LineChart
+    data={{
+      labels: chartLabels,
+      datasets: [
+        {
+          data: chartData.map(item => item.eatingNormal),
+          color: () => '#22c55e',
+          strokeWidth: 2,
+        },
+        {
+          data: chartData.map(item => item.moodAggressive),
+          color: () => '#ef4444',
+          strokeWidth: 2,
+        },
+        {
+          data: chartData.map(item => item.movementLimping),
+          color: () => '#eab308',
+          strokeWidth: 2,
+        },
+      ],
+      // legend removed
+    }}
+    width={Dimensions.get('window').width - 30}
+    height={220}
+    chartConfig={{
+      backgroundColor: '#f0fdf4',
+      backgroundGradientFrom: '#dcfce7',
+      backgroundGradientTo: '#bbf7d0',
+      decimalPlaces: 0,
+      color: (opacity = 1) => `rgba(0, 100, 0, ${opacity})`,
+      labelColor: (opacity = 1) => `rgba(34, 34, 34, ${opacity})`,
+      style: {
+        borderRadius: 16,
+      },
+      propsForDots: {
+        r: '4',
+        strokeWidth: '1',
+        stroke: '#22c55e',
+      },
+    }}
+    bezier
+    style={{
+      marginVertical: 10,
+      borderRadius: 16,
+      paddingBottom: 20,
+    }}
+  />
+
+
+  {/* Wrap siblings */}
+  <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
+    <Text style={{ fontSize: 10, color: '#22c55e' }}>Eating: Normal</Text>
+    <Text style={{ fontSize: 10, color: '#ef4444' }}>Mood: Aggressive</Text>
+    <Text style={{ fontSize: 10, color: '#eab308' }}>Movement: Limping</Text>
+  </View>
+</View>
+
+
+
+        ) : (
+          <Text style={{ color: '#555', paddingTop: 10 }}>No behavior data yet.</Text>
+        )}
+
+        </View>
+
+      </Animated.ScrollView>
+
+      {/* Drawer Modal */}
       <Modal visible={drawerVisible} transparent animationType="none" onRequestClose={closeDrawer}>
         <View style={styles.modalContainer}>
           <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
@@ -242,6 +290,7 @@ const Home = ({ navigation }) => {
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -279,166 +328,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
   },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#315342',
-  },
-  seeAll: {
-    color: '#315342',
-    fontWeight: '600',
-  },
-  featuredList: {
-    paddingBottom: 10,
-  },
-  featuredItem: {
-    width: width * 0.7,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    marginRight: 15,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  featuredImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  featuredInfo: {
-    padding: 15,
-  },
-  featuredTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: '#315342',
-  },
-  featuredDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-  },
-  featuredFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  featuredPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#315342',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingText: {
-    marginLeft: 5,
-    color: '#666',
-  },
-  categoryRow: {
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  categoryItem: {
-    width: '30%',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  categoryIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    backgroundColor: 'rgba(49, 83, 66, 0.1)',
-    borderWidth: 1,
-    borderColor: '#a4d9ab',
-  },
-  categoryText: {
-    fontSize: 14,
-    textAlign: 'center',
-    color: '#315342',
-  },
-  instructorsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  instructorCard: {
-    width: '30%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 10,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  instructorImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 10,
-  },
-  instructorName: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 3,
-  },
-  instructorField: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  specialOffer: {
-    borderRadius: 15,
-    overflow: 'hidden',
-    marginTop: 10,
-  },
-  specialOfferGradient: {
-    padding: 20,
-  },
-  specialOfferContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  specialOfferTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  specialOfferText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
   modalContainer: {
     flex: 1,
     flexDirection: 'row',
   },
+  behaviorSection: {
+  marginTop: 20,
+  paddingHorizontal: 20,
+},
+sectionTitle: {
+  fontSize: 20,
+  fontWeight: '600',
+  color: '#333',
+  marginBottom: 10,
+},
+behaviorCard: {
+  backgroundColor: '#f0fdf4',
+  borderRadius: 12,
+  padding: 12,
+  marginBottom: 10,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.1,
+  shadowRadius: 3,
+  elevation: 2,
+},
+animalName: {
+  fontWeight: '700',
+  fontSize: 16,
+  color: '#1e3a2a',
+},
+behaviorTime: {
+  fontSize: 12,
+  color: '#666',
+},
+behaviorDetails: {
+  fontSize: 14,
+  marginTop: 4,
+  color: '#374151',
+},
+alertText: {
+  marginTop: 6,
+  color: 'red',
+  fontWeight: 'bold',
+},
+
   drawerContainer: {
     width: width * 0.8,
     backgroundColor: '#fff',
@@ -452,6 +386,55 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
   },
+  taskSummaryContainer: {
+  padding: 16,
+  marginTop: -19,
+  backgroundColor: '#fff',
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.2,
+  shadowRadius: 6,
+  elevation: 6
+},
+taskTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  marginBottom: 12,
+  color: '#1f2937'
+},
+scrollView: {
+  flex: 1,
+  paddingTop: 18, // Adjust based on your header height
+  backgroundColor: '#f8f9fa',
+},
+taskBoxes: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+},
+taskBox: {
+  flex: 1,
+  alignItems: 'center',
+  padding: 16,
+  marginHorizontal: 6,
+  borderRadius: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.1,
+  shadowRadius: 2,
+  elevation: 2
+},
+taskCount: {
+  fontSize: 24,
+  fontWeight: 'bold',
+  color: '#1e293b',
+  marginTop: 8
+},
+taskLabel: {
+  fontSize: 14,
+  color: '#374151'
+},
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

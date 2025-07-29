@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 const ViewDetailedTask = () => {
   const route = useRoute();
+  const navigation = useNavigation();
   const { task } = route.params;
 
   const assignedTo = task.assignedTo || {};
@@ -12,15 +13,29 @@ const ViewDetailedTask = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heading}>📋 Task Details</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#1e3d3d" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
+            <Ionicons name="arrow-back" size={26} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Task Details</Text>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="search" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Task Info */}
+      <Text style={styles.heading}>📋 Task Details</Text>
       <View style={styles.card}>
         <Text style={styles.label}>Task Type:</Text>
         <Text style={styles.value}>{task.type}</Text>
 
         <Text style={styles.label}>Status:</Text>
-        <Text style={[styles.value, { color: task.status === 'Completed' ? 'green' : 'orange' }]}>
+        <Text style={[styles.value, { color: task.status === 'Completed' ? '#28a745' : '#ff9900' }]}>
           {task.status}
         </Text>
 
@@ -51,10 +66,7 @@ const ViewDetailedTask = () => {
       {/* Animal Info */}
       <Text style={styles.heading}>🐄 Animal Info</Text>
       <View style={styles.card}>
-        <Image
-          source={{ uri: animal.photo }}
-          style={styles.image}
-        />
+        <Image source={{ uri: animal.photo }} style={styles.image} />
         <Text style={styles.label}>Name:</Text>
         <Text style={styles.value}>{animal.name}</Text>
 
@@ -68,51 +80,81 @@ const ViewDetailedTask = () => {
         <Text style={styles.value}>{animal.age ? `${animal.age} years` : 'N/A'}</Text>
 
         <Text style={styles.label}>Health Status:</Text>
-        <Text style={[styles.value, {
-          color: animal.status === 'needs_attention' ? 'red' : 'green'
-        }]}>
+        <Text
+          style={[
+            styles.value,
+            { color: animal.status === 'needs_attention' ? '#e74c3c' : '#27ae60' },
+          ]}
+        >
           {animal.status}
         </Text>
       </View>
 
-      {/* Worker Info */}
-      <Text style={styles.heading}>👤 Assigned Worker</Text>
-      <View style={styles.card}>
-        <Image
-          source={{ uri: assignedTo.profilePhoto }}
-          style={styles.image}
-        />
-        <Text style={styles.label}>Name:</Text>
-        <Text style={styles.value}>{assignedTo.name || 'N/A'}</Text>
 
-        <Text style={styles.label}>Email:</Text>
-        <Text style={styles.value}>{assignedTo.email || 'N/A'}</Text>
-
-        <Text style={styles.label}>User Type:</Text>
-        <Text style={styles.value}>{assignedTo.userType || 'N/A'}</Text>
-      </View>
+      
+     
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    paddingBottom: 50,
-    backgroundColor: '#f5f5f5',
+    flexGrow: 1,
+    backgroundColor: '#edf5f3',
+    paddingBottom: 40,
+  },
+  header: {
+    backgroundColor: '#1e3d3d',
+    paddingTop: 50,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  iconButton: {
+    padding: 8,
+    backgroundColor: '#446A53',
+    borderRadius: 50,
+  },
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   heading: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginVertical: 10,
-    color: '#2f4f4f',
+    fontSize: 24,
+    fontWeight: '700',
+    marginVertical: 12,
+    marginHorizontal: 20,
+    color: '#1e3d3d',
+  },
+   modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   card: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginHorizontal: 20,
+    padding: 18,
+    borderRadius: 16,
     marginBottom: 20,
-    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    borderLeftWidth: 5,
+    borderLeftColor: '#a4d9ab',
   },
   label: {
     fontSize: 14,
@@ -122,14 +164,22 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#222',
   },
   image: {
     width: '100%',
     height: 180,
-    borderRadius: 10,
+    borderRadius: 14,
     marginBottom: 10,
-    backgroundColor: '#ddd',
+    backgroundColor: '#ccc',
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignSelf: 'center',
+    marginBottom: 15,
+    backgroundColor: '#ccc',
   },
 });
 

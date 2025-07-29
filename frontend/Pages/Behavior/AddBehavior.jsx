@@ -19,6 +19,7 @@ import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API_BASE_URL from '../../utils/api';
 import CustomDrawer from '../CustomDrawer';
+import { useNavigation } from '@react-navigation/native';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -30,7 +31,7 @@ const ViewAnimals = () => {
   const [movement, setMovement] = useState('Active');
   const [mood, setMood] = useState('Calm');
   const [notes, setNotes] = useState('');
-
+  const navigation = useNavigation();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-screenWidth * 0.8)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -160,6 +161,21 @@ const ViewAnimals = () => {
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            {/* Close button */}
+            <TouchableOpacity 
+              style={styles.closeButton} 
+              onPress={() => {
+                setModalVisible(false);
+                setNotes(''); // Reset notes when closing
+                // Reset other fields to default values
+                setEating('Normal');
+                setMovement('Active');
+                setMood('Calm');
+              }}
+            >
+              <Icon name="close" size={24} color="#666" />
+            </TouchableOpacity>
+
             <Text style={styles.modalTitle}>Log Behavior</Text>
 
             <Text style={styles.label}>Eating</Text>
@@ -215,7 +231,7 @@ const ViewAnimals = () => {
               elevation: 5,
             }}
           >
-            <CustomDrawer onClose={closeDrawer} />
+            <CustomDrawer onClose={closeDrawer} navigation={navigation} />
           </Animated.View>
         </View>
       </Modal>
@@ -337,5 +353,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
     marginTop: 10,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    padding: 5,
   },
 });

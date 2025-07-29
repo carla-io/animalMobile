@@ -136,6 +136,7 @@ router.post('/login', async (req, res) => {
             token,
             user: {
                 id: user._id,
+                _id: user._id,
                 name: user.name,
                 email: user.email,
                 userType: user.userType,
@@ -151,5 +152,7 @@ router.post('/login', async (req, res) => {
         });
     }
 });
+
+
 
 module.exports = router;

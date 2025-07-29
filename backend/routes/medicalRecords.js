@@ -207,4 +207,28 @@ router.get('/animal/:animalId', auth, async (req, res) => {
   }
 });
 
+router.get('/user', auth, async (req, res) => {
+  try {
+    // Check if user is an animal owner
+    if (req.user.userType !== 'owner') {
+      return res.status(403).json({ msg: 'Only animal owners can access their medical records' });
+    }
+
+    // Find animals that belong to the user
+    const animals = await Animal.find({ owner: req.user.id }).select('_id');
+
+    const animalIds = animals.map(a => a._id);
+
+    const records = await MedicalRecord.find({ animal: { $in: animalIds } })
+      .populate('animal', 'name species breed')
+      .populate('veterinarian', 'name')
+      .sort({ date: -1 });
+
+    res.json(records);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;
