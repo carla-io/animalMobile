@@ -100,13 +100,13 @@ const Dashboard = () => {
     fetchData(true);
   };
 
-  const handleExportReport = () => {
-    Alert.alert(
-      'Export Report',
-      'Export functionality will be implemented soon.',
-      [{ text: 'OK' }]
-    );
-  };
+  // const handleExportReport = () => {
+  //   Alert.alert(
+  //     'Export Report',
+  //     'Export functionality will be implemented soon.',
+  //     [{ text: 'OK' }]
+  //   );
+  // };
 
   const dashboardStats = {
     totalUsers: data.users,
@@ -154,13 +154,7 @@ const Dashboard = () => {
               {loading || refreshing ? 'Refreshing...' : 'Refresh'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnPrimary]}
-            onPress={handleExportReport}
-          >
-            <Icon name="download" size={16} color="white" />
-            <Text style={styles.btnPrimaryText}>Export Report</Text>
-          </TouchableOpacity>
+         
         </View>
       </View>
 

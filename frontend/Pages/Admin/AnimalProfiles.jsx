@@ -42,11 +42,11 @@ const AnimalProfiles = ({ setShowAnimalModal }) => {
     detail: false,
     edit: false,
     add: false,
-    delete: false
+    deceased: false
   });
   const [editAnimal, setEditAnimal] = useState({});
   const [newAnimal, setNewAnimal] = useState({
-    name: '', species: '', breed: '', age: '', status: 'healthy', owner: ''
+    name: '', species: '', breed: '', age: '', status: 'healthy'
   });
   const [photos, setPhotos] = useState({
     editFile: null, newFile: null, editPreview: '', newPreview: ''
@@ -222,7 +222,7 @@ const captureImage = async (isEdit = false) => {
   };
 
   const openModal = (type, animal = null) => {
-    setModals({ detail: false, edit: false, add: false, delete: false, [type]: true });
+    setModals({ detail: false, edit: false, add: false, deceased: false, [type]: true });
     if (animal) {
       setSelectedAnimal(animal);
       if (type === 'edit') {
@@ -233,23 +233,29 @@ const captureImage = async (isEdit = false) => {
   };
 
   const closeModal = () => {
-    setModals({ detail: false, edit: false, add: false, delete: false });
+    setModals({ detail: false, edit: false, add: false, deceased: false });
     setSelectedAnimal(null);
     setEditAnimal({});
-    setNewAnimal({ name: '', species: '', breed: '', age: '', status: 'healthy', owner: '' });
+    setNewAnimal({ name: '', species: '', breed: '', age: '', status: 'healthy' });
     setPhotos({ editFile: null, newFile: null, editPreview: '', newPreview: '' });
   };
 
-  const handleDelete = async () => {
+  const handleMarkAsDeceased = async () => {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/animal/delete/${selectedAnimal._id}`);
+      const response = await axios.put(`${API_BASE_URL}/animal/update/${selectedAnimal._id}`, {
+        status: 'deceased'
+      });
       if (response.data.success) {
-        setAnimals(prev => prev.filter(animal => animal._id !== selectedAnimal._id));
-        Alert.alert('Success', `${selectedAnimal.name} deleted successfully!`);
+        setAnimals(prev => prev.map(animal => 
+          animal._id === selectedAnimal._id 
+            ? { ...animal, status: 'deceased' }
+            : animal
+        ));
+        Alert.alert('Updated', `${selectedAnimal.name} has been marked as deceased.`);
         closeModal();
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete animal');
+      Alert.alert('Error', 'Failed to update animal status');
       console.error('Error:', error);
     }
   };
@@ -400,10 +406,23 @@ const captureImage = async (isEdit = false) => {
     );
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'healthy':
+        return '#48bb78';
+      case 'needs_attention':
+        return '#ed8936';
+      case 'deceased':
+        return '#718096';
+      default:
+        return '#a0aec0';
+    }
+  };
+
   const renderFormFields = (data, setData) => (
     <>
       {renderPhotoSection(data === editAnimal)}
-      {['name', 'species', 'breed', 'age', 'owner'].map(field => (
+      {['name', 'species', 'breed', 'age'].map(field => (
         <View key={field} style={styles.formField}>
           <Text style={styles.formLabel}>
             {field.charAt(0).toUpperCase() + field.slice(1)}
@@ -447,6 +466,20 @@ const captureImage = async (isEdit = false) => {
               data.status === 'needs_attention' && styles.statusOptionTextActive
             ]}>
               Needs Attention
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.statusOption,
+              data.status === 'deceased' && styles.statusOptionActive
+            ]}
+            onPress={() => setData(prev => ({ ...prev, status: 'deceased' }))}
+          >
+            <Text style={[
+              styles.statusOptionText,
+              data.status === 'deceased' && styles.statusOptionTextActive
+            ]}>
+              Deceased
             </Text>
           </TouchableOpacity>
         </View>
@@ -501,12 +534,28 @@ const captureImage = async (isEdit = false) => {
           </View>
         ) : (
           animals.map(animal => (
-            <View key={animal._id} style={styles.animalCard}>
+            <View key={animal._id} style={[
+              styles.animalCard,
+              animal.status === 'deceased' && styles.deceasedCard
+            ]}>
               <View style={styles.animalPhotoContainer}>
                 {animal.photo ? (
-                  <Image source={{ uri: animal.photo }} style={styles.animalPhoto} />
+                  <View style={styles.photoWrapper}>
+                    <Image source={{ uri: animal.photo }} style={[
+                      styles.animalPhoto,
+                      animal.status === 'deceased' && styles.deceasedPhoto
+                    ]} />
+                    {animal.status === 'deceased' && (
+                      <View style={styles.deceasedOverlay}>
+                        <Icon name="heart" size={20} color="#fff" />
+                      </View>
+                    )}
+                  </View>
                 ) : (
-                  <View style={styles.animalPhotoPlaceholder}>
+                  <View style={[
+                    styles.animalPhotoPlaceholder,
+                    animal.status === 'deceased' && styles.deceasedPhotoPlaceholder
+                  ]}>
                     <Icon name="camera" size={32} color="#a0aec0" />
                     <Text style={styles.photoPlaceholderText}>No Photo</Text>
                   </View>
@@ -515,10 +564,16 @@ const captureImage = async (isEdit = false) => {
 
               <View style={styles.animalInfo}>
                 <View style={styles.animalHeader}>
-                  <Text style={styles.animalName}>{animal.name}</Text>
+                  <Text style={[
+                    styles.animalName,
+                    animal.status === 'deceased' && styles.deceasedText
+                  ]}>
+                    {animal.name}
+                    {animal.status === 'deceased' && ' ♥'}
+                  </Text>
                   <View style={[
                     styles.statusBadge,
-                    { backgroundColor: animal.status === 'healthy' ? '#48bb78' : '#ed8936' }
+                    { backgroundColor: getStatusColor(animal.status) }
                   ]}>
                     <Text style={styles.statusText}>
                       {animal.status?.replace('_', ' ') || 'N/A'}
@@ -527,7 +582,7 @@ const captureImage = async (isEdit = false) => {
                 </View>
 
                 <View style={styles.animalDetails}>
-                  {['species', 'breed', 'age', 'owner'].map(field => (
+                  {['species', 'breed', 'age'].map(field => (
                     <View key={field} style={styles.animalDetail}>
                       <Text style={styles.animalDetailLabel}>
                         {field.charAt(0).toUpperCase() + field.slice(1)}:
@@ -547,20 +602,24 @@ const captureImage = async (isEdit = false) => {
                     <Icon name="eye" size={16} color="#315342" />
                     <Text style={styles.actionButtonText}>View</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => openModal('edit', animal)}
-                  >
-                    <Icon name="edit-3" size={16} color="#315342" />
-                    <Text style={styles.actionButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => openModal('delete', animal)}
-                  >
-                    <Icon name="trash-2" size={16} color="#e53e3e" />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
-                  </TouchableOpacity>
+                  {animal.status !== 'deceased' && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => openModal('edit', animal)}
+                      >
+                        <Icon name="edit-3" size={16} color="#315342" />
+                        <Text style={styles.actionButtonText}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.deceasedButton]}
+                        onPress={() => openModal('deceased', animal)}
+                      >
+                        <Icon name="heart" size={16} color="#718096" />
+                        <Text style={[styles.actionButtonText, styles.deceasedButtonText]}>Deceased</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               </View>
             </View>
@@ -575,6 +634,7 @@ const captureImage = async (isEdit = false) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {selectedAnimal?.name}'s Details
+                {selectedAnimal?.status === 'deceased' && ' ♥'}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <Icon name="x" size={24} color="#4a5568" />
@@ -583,13 +643,23 @@ const captureImage = async (isEdit = false) => {
             
             <ScrollView style={styles.modalBody}>
               {selectedAnimal?.photo && (
-                <Image 
-                  source={{ uri: selectedAnimal.photo }} 
-                  style={styles.detailPhoto} 
-                />
+                <View style={styles.detailPhotoContainer}>
+                  <Image 
+                    source={{ uri: selectedAnimal.photo }} 
+                    style={[
+                      styles.detailPhoto,
+                      selectedAnimal.status === 'deceased' && styles.deceasedPhoto
+                    ]} 
+                  />
+                  {selectedAnimal.status === 'deceased' && (
+                    <View style={styles.deceasedOverlay}>
+                      <Icon name="heart" size={24} color="#fff" />
+                    </View>
+                  )}
+                </View>
               )}
               
-              {['species', 'breed', 'age', 'owner'].map(field => (
+              {['species', 'breed', 'age'].map(field => (
                 <View key={field} style={styles.detailItem}>
                   <Text style={styles.detailLabel}>
                     {field.charAt(0).toUpperCase() + field.slice(1)}:
@@ -604,7 +674,7 @@ const captureImage = async (isEdit = false) => {
                 <Text style={styles.detailLabel}>Status:</Text>
                 <View style={[
                   styles.statusBadge,
-                  { backgroundColor: selectedAnimal?.status === 'healthy' ? '#48bb78' : '#ed8936' }
+                  { backgroundColor: getStatusColor(selectedAnimal?.status) }
                 ]}>
                   <Text style={styles.statusText}>
                     {selectedAnimal?.status?.replace('_', ' ') || 'N/A'}
@@ -698,26 +768,29 @@ const captureImage = async (isEdit = false) => {
         </View>
       </Modal>
 
-      {/* Delete Modal */}
-      <Modal visible={modals.delete} animationType="slide" transparent={true}>
+      {/* Deceased Modal */}
+      <Modal visible={modals.deceased} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Delete Animal</Text>
+              <Text style={styles.modalTitle}>Mark as Deceased</Text>
               <TouchableOpacity onPress={closeModal}>
                 <Icon name="x" size={24} color="#4a5568" />
               </TouchableOpacity>
             </View>
             
             <View style={styles.modalBody}>
-              <View style={styles.deleteWarning}>
-                <Icon name="trash-2" size={48} color="#e53e3e" />
-                <Text style={styles.deleteWarningText}>
-                  Are you sure you want to delete{' '}
-                  <Text style={styles.deleteWarningName}>
+              <View style={styles.deceasedWarning}>
+                <Icon name="heart" size={48} color="#718096" />
+                <Text style={styles.deceasedWarningText}>
+                  Are you sure you want to mark{' '}
+                  <Text style={styles.deceasedWarningName}>
                     {selectedAnimal?.name}
                   </Text>
-                  ? This action cannot be undone.
+                  {' '}as deceased? This will update their status to deceased for record-keeping purposes.
+                </Text>
+                <Text style={styles.deceasedNote}>
+                  The animal's profile will remain in your records but will be marked as deceased.
                 </Text>
               </View>
             </View>
@@ -726,9 +799,9 @@ const captureImage = async (isEdit = false) => {
               <TouchableOpacity style={styles.btnSecondary} onPress={closeModal}>
                 <Text style={styles.btnSecondaryText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.btnDanger} onPress={handleDelete}>
-                <Icon name="trash-2" size={16} color="#fff" />
-                <Text style={styles.btnDangerText}>Delete</Text>
+              <TouchableOpacity style={styles.btnDeceased} onPress={handleMarkAsDeceased}>
+                <Icon name="heart" size={16} color="#fff" />
+                <Text style={styles.btnDeceasedText}>Mark as Deceased</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -754,6 +827,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f7fafc',
+    marginBottom: 40
   },
   loadingContainer: {
     flex: 1,
@@ -762,92 +836,132 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7fafc',
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
-    color: '#315342',
+    color: '#4a5568',
   },
   header: {
-     paddingBottom: 30,
-        paddingTop: getStatusBarHeight(),
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        backgroundColor: '#315342',
+    backgroundColor: '#315342',
+    paddingTop: getStatusBarHeight(),
   },
   headerContent: {
     paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   menuButton: {
     padding: 8,
+    marginLeft: -8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+    textAlign: 'center',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#a4d9ab',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
     marginTop: 4,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4a6741',
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
   },
   addButtonText: {
     color: '#fff',
-    marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
+    marginLeft: 4,
   },
   content: {
     flex: 1,
     padding: 20,
   },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4a5568',
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#a0aec0',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   animalCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    marginBottom: 50,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    marginBottom: 50
+    overflow: 'hidden',
+  },
+  deceasedCard: {
+    backgroundColor: '#f8f9fa',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
   },
   animalPhotoContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
+    height: 200,
+    backgroundColor: '#edf2f7',
+  },
+  photoWrapper: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
   },
   animalPhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  deceasedPhoto: {
+    opacity: 0.7,
+  },
+  deceasedOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    padding: 8,
   },
   animalPhotoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f1f5f9',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#edf2f7',
+  },
+  deceasedPhotoPlaceholder: {
+    backgroundColor: '#f1f3f4',
   },
   photoPlaceholderText: {
     fontSize: 12,
     color: '#a0aec0',
-    marginTop: 4,
+    marginTop: 8,
   },
   animalInfo: {
-    flex: 1,
+    padding: 16,
   },
   animalHeader: {
     flexDirection: 'row',
@@ -856,19 +970,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   animalName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2d3748',
+    flex: 1,
+  },
+  deceasedText: {
+    color: '#718096',
   },
   statusBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    marginLeft: 8,
   },
   statusText: {
     fontSize: 12,
-    color: '#fff',
     fontWeight: '600',
+    color: '#fff',
     textTransform: 'capitalize',
   },
   animalDetails: {
@@ -876,13 +995,13 @@ const styles = StyleSheet.create({
   },
   animalDetail: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   animalDetailLabel: {
     fontSize: 14,
-    color: '#718096',
     fontWeight: '600',
-    minWidth: 80,
+    color: '#4a5568',
+    width: 80,
   },
   animalDetailValue: {
     fontSize: 14,
@@ -901,20 +1020,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    backgroundColor: '#f7fafc',
   },
   actionButtonText: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#315342',
     marginLeft: 4,
-    fontWeight: '600',
   },
   deleteButton: {
     backgroundColor: '#fed7d7',
   },
   deleteButtonText: {
     color: '#e53e3e',
+  },
+  deceasedButton: {
+    backgroundColor: '#f1f3f4',
+  },
+  deceasedButtonText: {
+    color: '#718096',
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  drawerContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: width * 0.8,
   },
   modalOverlay: {
     flex: 1,
@@ -927,6 +1066,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     width: width * 0.9,
     maxHeight: height * 0.8,
+    maxWidth: 400,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -940,6 +1080,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2d3748',
+    flex: 1,
   },
   modalBody: {
     padding: 20,
@@ -954,279 +1095,85 @@ const styles = StyleSheet.create({
   },
   btnSecondary: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#f7fafc',
     marginRight: 12,
   },
   btnSecondaryText: {
-    color: '#4a5568',
     fontSize: 14,
     fontWeight: '600',
+    color: '#4a5568',
   },
   btnPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
     backgroundColor: '#315342',
   },
   btnPrimaryText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+    color: '#fff',
     marginLeft: 4,
   },
   btnDanger: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
     backgroundColor: '#e53e3e',
   },
   btnDangerText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+    color: '#fff',
     marginLeft: 4,
   },
-  photoSection: {
-    marginBottom: 16,
-  },
-  photoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2d3748',
-    marginBottom: 8,
-  },
-  photoPreviewContainer: {
-    position: 'relative',
-    alignItems: 'center',
-  },
-  photoPreview: {
-    width: 120,
-    height: 120,
-    borderRadius: 12,
-  },
-  removePhotoBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#e53e3e',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoUploadArea: {
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    paddingVertical: 40,
-    alignItems: 'center',
-    backgroundColor: '#f7fafc',
-  },
-  photoUploadText: {
-    fontSize: 14,
-    color: '#718096',
-    marginTop: 8,
-  },
-  formField: {
-    marginBottom: 16,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2d3748',
-    marginBottom: 8,
-  },
-  formInput: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: '#fff',
-  },
-  statusContainer: {
+  btnDeceased: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  statusOption: {
-    flex: 1,
-    paddingVertical: 12,
+    alignItems: 'center',
     paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  statusOptionSelected: {
-    backgroundColor: '#315342',
-    borderColor: '#315342',
-  },
-  statusOptionText: {
-    fontSize: 14,
-    color: '#718096',
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  statusOptionTextSelected: {
-    color: '#fff',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyStateIcon: {
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2d3748',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#718096',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#e53e3e',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#315342',
-    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
+    backgroundColor: '#718096',
   },
-  retryButtonText: {
-    color: '#fff',
+  btnDeceasedText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#2d3748',
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  filterButtonActive: {
-    backgroundColor: '#315342',
-    borderColor: '#315342',
-  },
-  filterButtonText: {
-    fontSize: 12,
-    color: '#718096',
-    fontWeight: '600',
-  },
-  filterButtonTextActive: {
     color: '#fff',
+    marginLeft: 4,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingBottom: 20,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#315342',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  fabIcon: {
-    color: '#fff',
-  },
-  // Detail Modal Styles
   detailPhoto: {
     width: '100%',
     height: 200,
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: 16,
     resizeMode: 'cover',
   },
+  detailPhotoContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
   detailItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    marginBottom: 12,
   },
   detailLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4a5568',
-    flex: 1,
+    width: 100,
   },
   detailValue: {
     fontSize: 14,
     color: '#2d3748',
-    flex: 2,
-    textAlign: 'right',
+    flex: 1,
   },
-  // Delete Modal Styles
   deleteWarning: {
     alignItems: 'center',
     paddingVertical: 20,
@@ -1242,139 +1189,113 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#e53e3e',
   },
-  // Custom Drawer Styles
-  modalContainer: {
-    flex: 1,
-    flexDirection: 'row-reverse',
+  deceasedWarning: {
+    alignItems: 'center',
+    paddingVertical: 20,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  deceasedWarningText: {
+    fontSize: 16,
+    color: '#4a5568',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 24,
   },
-  drawerContainer: {
-    width: width * 0.8,
+  deceasedWarningName: {
+    fontWeight: 'bold',
+    color: '#718096',
+  },
+  deceasedNote: {
+    fontSize: 14,
+    color: '#718096',
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic',
+  },
+  formField: {
+    marginBottom: 16,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4a5568',
+    marginBottom: 8,
+  },
+  required: {
+    color: '#e53e3e',
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
     backgroundColor: '#fff',
-    elevation: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
   },
-  // Status Option Active State
+  statusContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
+  },
   statusOptionActive: {
     backgroundColor: '#315342',
     borderColor: '#315342',
   },
+  statusOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4a5568',
+  },
   statusOptionTextActive: {
     color: '#fff',
   },
-  // Form Input Focus State
-  formInputFocused: {
-    borderColor: '#315342',
-    borderWidth: 2,
-  },
-  // Loading States
-  cardLoadingContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+  photoSection: {
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 150,
   },
-  // Responsive Design
-  responsiveContainer: {
-    paddingHorizontal: width > 768 ? 40 : 20,
-  },
-  responsiveModal: {
-    width: width > 768 ? width * 0.7 : width * 0.9,
-    maxWidth: 600,
-  },
-  // Animation Styles
-  slideInContainer: {
-    transform: [{ translateX: width }],
-  },
-  slideInContainerVisible: {
-    transform: [{ translateX: 0 }],
-  },
-  fadeInContainer: {
-    opacity: 0,
-  },
-  fadeInContainerVisible: {
-    opacity: 1,
-  },
-  // Additional Status Colors
-  statusHealthy: {
-    backgroundColor: '#48bb78',
-  },
-  statusNeedsAttention: {
-    backgroundColor: '#ed8936',
-  },
-  statusCritical: {
-    backgroundColor: '#e53e3e',
-  },
-  statusRecovering: {
-    backgroundColor: '#3182ce',
-  },
-  // Photo Upload Improvements
-  photoUploadAreaActive: {
-    borderColor: '#315342',
-    backgroundColor: '#f0f9f0',
-  },
-  photoUploadIcon: {
+  photoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4a5568',
     marginBottom: 8,
   },
-  // Button Hover States (for web compatibility)
-  buttonHover: {
-    opacity: 0.8,
-  },
-  // Accessibility Improvements
-  accessibilityFocus: {
+  photoUploadArea: {
     borderWidth: 2,
-    borderColor: '#315342',
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 32,
+    alignItems: 'center',
+    backgroundColor: '#f7fafc',
   },
-  // Card Variations
-  animalCardSelected: {
-    borderColor: '#315342',
-    borderWidth: 2,
-  },
-  animalCardDisabled: {
-    opacity: 0.6,
-  },
-  // Text Variations
-  textMuted: {
+  photoUploadText: {
+    fontSize: 14,
     color: '#718096',
-  },
-  textBold: {
-    fontWeight: 'bold',
-  },
-  textCenter: {
-    textAlign: 'center',
-  },
-  // Spacing Utilities
-  marginTop8: {
     marginTop: 8,
   },
-  marginTop16: {
-    marginTop: 16,
+  photoPreviewContainer: {
+    position: 'relative',
   },
-  marginBottom8: {
-    marginBottom: 8,
+  photoPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    resizeMode: 'cover',
   },
-  marginBottom16: {
-    marginBottom: 16,
-  },
-  paddingHorizontal16: {
-    paddingHorizontal: 16,
-  },
-  paddingVertical8: {
-    paddingVertical: 8,
+  removePhotoBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    padding: 4,
   },
 });
 

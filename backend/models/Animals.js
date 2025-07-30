@@ -6,7 +6,7 @@ const animalSchema = new mongoose.Schema({
   breed: { type: String },
   age: { type: Number },
   status: { type: String, enum: ['healthy', 'needs_attention'], default: 'healthy' },
-  owner: { type: String },
+  // owner: { type: String },
   photo: {
     type: String,
     default: function () {

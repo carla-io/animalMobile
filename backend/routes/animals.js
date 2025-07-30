@@ -38,7 +38,7 @@ router.get('/getAll', async (req, res) => {
 // ✅ Add new animal with image upload
 router.post('/add', upload.single('photo'), async (req, res) => {
   try {
-    const { name, species, breed, age, owner, status } = req.body;
+    const { name, species, breed, age, status } = req.body;
 
     let photoUrl = '';
     if (req.file && req.file.path) {
@@ -50,7 +50,7 @@ router.post('/add', upload.single('photo'), async (req, res) => {
       species,
       breed,
       age,
-      owner,
+      
       status,
       photo: photoUrl, // ✅ store real URL
     });
@@ -112,20 +112,25 @@ router.put('/update/:id', upload.single('photo'), async (req, res) => {
 });
 
 
-// ✅ Delete animal
+// ✅ Inactivate animal (set status to 'deceased' instead of deleting)
 router.delete('/delete/:id', async (req, res) => {
   try {
-    const animal = await Animal.findByIdAndDelete(req.params.id);
+    const animal = await Animal.findByIdAndUpdate(
+      req.params.id,
+      { status: 'deceased' }, // Or use 'inactive' based on your convention
+      { new: true }
+    );
 
     if (!animal) {
       return res.status(404).json({ success: false, message: 'Animal not found' });
     }
 
-    res.status(200).json({ success: true, message: 'Animal deleted successfully' });
+    res.status(200).json({ success: true, message: 'Animal marked as deceased', animal });
   } catch (error) {
-    console.error('Error deleting animal:', error);
+    console.error('Error inactivating animal:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 
 module.exports = router;
