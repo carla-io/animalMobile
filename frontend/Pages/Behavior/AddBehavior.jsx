@@ -20,6 +20,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import API_BASE_URL from '../../utils/api';
 import CustomDrawer from '../CustomDrawer';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -35,6 +38,7 @@ const ViewAnimals = () => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-screenWidth * 0.8)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const [video, setVideo] = useState(null);
 
   const openDrawer = () => {
     setDrawerVisible(true);
@@ -53,6 +57,50 @@ const ViewAnimals = () => {
     ]).start();
   };
 
+  const requestPermission = async () => {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    alert('Permission to access media library is required!');
+  }
+};
+
+const pickVideo = async () => {
+  if (video) return; // prevent re-picking if already selected
+
+  try {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      alert('Permission to access media library is required!');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: false,
+      quality: 1,
+    });
+
+    if (!result.cancelled) {
+      const localUri = result.assets[0].uri;
+      const filename = localUri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename || '');
+      const type = match ? `video/${match[1]}` : `video/mp4`;
+
+      setVideo({
+        uri: localUri,
+        name: filename,
+        type,
+      });
+
+      console.log('✅ Video selected:', { uri: localUri, name: filename, type });
+    } else {
+      console.log('🚫 User cancelled picking video.');
+    }
+  } catch (error) {
+    console.error('❌ Error picking video:', error);
+  }
+};
+
   const closeDrawer = () => {
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -66,6 +114,17 @@ const ViewAnimals = () => {
         useNativeDriver: true,
       }),
     ]).start(() => setDrawerVisible(false));
+  };
+
+  // Function to close modal and reset form
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedAnimal(null);
+    setEating('Normal');
+    setMovement('Active');
+    setMood('Calm');
+    setNotes('');
+    setVideo(null);
   };
 
   useEffect(() => {
@@ -89,30 +148,43 @@ const ViewAnimals = () => {
   };
 
   const submitBehavior = async () => {
-    try {
-      const userId = await AsyncStorage.getItem('userId');
-      if (!userId) {
-        alert('User ID not found. Please log in again.');
-        return;
-      }
-
-      await axios.post(`${API_BASE_URL}/behavior/add`, {
-        animalId: selectedAnimal._id,
-        eating,
-        movement,
-        mood,
-        notes,
-        recordedBy: userId,
-      });
-
-      alert('Behavior logged!');
-      setModalVisible(false);
-      setNotes('');
-    } catch (err) {
-      console.error('Submit error:', err.response?.data || err.message);
-      alert('Error submitting behavior');
+  try {
+    const userId = await AsyncStorage.getItem('userId');
+    if (!userId) {
+      alert('User ID not found. Please log in again.');
+      return;
     }
-  };
+
+    if (!video) {
+      alert('Please attach a proof video before submitting.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('animalId', selectedAnimal._id);
+    formData.append('eating', eating);
+    formData.append('movement', movement);
+    formData.append('mood', mood);
+    formData.append('notes', notes);
+    formData.append('recordedBy', userId);
+
+    formData.append('proofVideo', {
+  uri: video.uri,
+  name: video.name,
+  type: video.type,
+});
+
+    await axios.post(`${API_BASE_URL}/behavior/add`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    alert('Behavior logged!');
+    closeModal(); // Use closeModal instead of just setModalVisible(false)
+  } catch (err) {
+    console.error('Submit error:', err.response?.data || err.message);
+    alert('Error submitting behavior');
+  }
+};
 
   const renderItem = ({ item }) => (
     <View style={styles.cardWrapper}>
@@ -161,22 +233,13 @@ const ViewAnimals = () => {
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Close button */}
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={() => {
-                setModalVisible(false);
-                setNotes(''); // Reset notes when closing
-                // Reset other fields to default values
-                setEating('Normal');
-                setMovement('Active');
-                setMood('Calm');
-              }}
-            >
-              <Icon name="close" size={24} color="#666" />
-            </TouchableOpacity>
-
-            <Text style={styles.modalTitle}>Log Behavior</Text>
+            {/* Modal Header with Close Button */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Log Behavior</Text>
+              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                <Icon name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
 
             <Text style={styles.label}>Eating</Text>
             <Picker selectedValue={eating} onValueChange={setEating}>
@@ -205,10 +268,29 @@ const ViewAnimals = () => {
               value={notes}
               onChangeText={setNotes}
             />
-
-            <TouchableOpacity style={styles.submitBtn} onPress={submitBehavior}>
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Submit</Text>
+            
+            <TouchableOpacity onPress={() => !video && pickVideo()}
+              style={styles.attachButton}
+            >
+              <View>
+                <Text>Attach Video</Text>
+                {video && (
+                  <Text style={{ fontSize: 12, marginBottom: 5, color: '#555' }}>
+                    Attached: {video.fileName}
+                  </Text>
+                )}
+              </View>
             </TouchableOpacity>
+
+            {/* Action Buttons */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={submitBehavior}>
+                <Text style={styles.submitBtnText}>Submit</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -238,7 +320,6 @@ const ViewAnimals = () => {
     </View>
   );
 };
-
 
 export default ViewAnimals;
 
@@ -329,10 +410,18 @@ const styles = StyleSheet.create({
     width: '85%',
     elevation: 5,
   },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+  },
+  closeButton: {
+    padding: 5,
   },
   label: {
     marginTop: 10,
@@ -347,18 +436,40 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
   },
+  attachButton: {
+    padding: 10,
+    backgroundColor: '#ddd',
+    marginVertical: 10,
+    borderRadius: 5,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15,
+    gap: 10,
+  },
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  cancelBtnText: {
+    color: '#666',
+    fontWeight: 'bold',
+  },
   submitBtn: {
+    flex: 1,
     backgroundColor: '#2d4b37',
     padding: 12,
     alignItems: 'center',
     borderRadius: 10,
-    marginTop: 10,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 10,
-    padding: 5,
+  submitBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });

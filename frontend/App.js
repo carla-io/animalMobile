@@ -27,6 +27,9 @@ import VaccinationRecords from './Pages/Veterinarian/VaccinationRecords'
 import MedicalHistory from './Pages/Veterinarian/MedicalHistory'
 import Behavior from './Pages/Admin/Behaviors';
 import AnimalCheckups from './Pages/AnimalProf/AnimalCheckup'; // New import
+import ReportGenerator from './Pages/Veterinarian/ReportGenerator'; // New import
+
+
 const Stack = createStackNavigator();
 
 const theme = {
@@ -158,6 +161,16 @@ export default function App() {
               component={VaccinationRecords}
               options={{ headerShown: false }}
             />
+
+<Stack.Screen 
+  name="GenerateReport" 
+  component={ReportGenerator}
+  options={{
+    headerShown: false,
+    title: 'Generate Report'
+  }}
+/>
+
             {/* <Stack.Screen
               name="MedicalHistory"
               component={MedicalHistory}

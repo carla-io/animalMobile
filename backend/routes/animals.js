@@ -24,10 +24,10 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-// ✅ GET all animals
+// ✅ GET all animals (excluding deceased)
 router.get('/getAll', async (req, res) => {
   try {
-    const animals = await Animal.find();
+    const animals = await Animal.find({ status: { $ne: 'deceased' } });
     res.status(200).json({ success: true, animals });
   } catch (error) {
     console.error('Error fetching animals:', error);
@@ -63,10 +63,10 @@ router.post('/add', upload.single('photo'), async (req, res) => {
 });
 
 
-// ✅ Count all animals
+// ✅ Count all animals (excluding deceased)
 router.get('/count', async (req, res) => {
   try {
-    const count = await Animal.countDocuments();
+    const count = await Animal.countDocuments({ status: { $ne: 'deceased' } });
     res.status(200).json({ success: true, count });
   } catch (error) {
     console.error('Error counting animals:', error);

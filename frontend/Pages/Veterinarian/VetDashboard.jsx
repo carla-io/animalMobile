@@ -231,7 +231,7 @@ const VetDashboard = ({ navigation }) => {
     <TouchableOpacity 
       style={styles.recordItem}
       onPress={() => navigation.navigate('MedicalRecordsStack', { 
-        screen: 'MedicalRecordDetail',
+        screen: 'MedicalRecordDetailScreen',
         params: { recordId: item._id }
       })}
       activeOpacity={0.8}

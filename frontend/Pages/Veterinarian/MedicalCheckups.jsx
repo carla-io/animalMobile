@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -12,10 +13,13 @@ import {
   TextInput,
   Alert,
   RefreshControl,
-  DrawerLayoutAndroid
+  DrawerLayoutAndroid,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API_BASE_URL from '../../utils/api';
@@ -39,6 +43,16 @@ const formatStatus = (status) => {
   ).join(' ');
 };
 
+const getStatusColor = (status) => {
+  switch(status) {
+    case 'active': return '#FFA500';
+    case 'fully_healed': return '#4CAF50';
+    case 'in_recovery': return '#2196F3';
+    case 'deceased': return '#F44336';
+    default: return '#666';
+  }
+};
+
 const ViewCheckup = ({ record, animals, statusOptions, onClose, onEdit }) => {
   const getAnimalName = () => {
     if (!record.animal) return 'Unknown Animal';
@@ -47,6 +61,52 @@ const ViewCheckup = ({ record, animals, statusOptions, onClose, onEdit }) => {
     }
     const animal = animals.find(a => a._id === record.animal);
     return animal ? animal.name : 'Unknown Animal';
+  };
+
+  const getAnimalImage = () => {
+    if (!record.animal) return null;
+    if (typeof record.animal === 'object' && record.animal.photo) {
+      return record.animal.photo;
+    }
+    const animal = animals.find(a => a._id === record.animal);
+    return animal ? animal.photo : null;
+  };
+
+  const handleAttachmentPress = (url) => {
+    if (!url) {
+      Alert.alert('Error', 'No attachment URL available');
+      return;
+    }
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'Could not open attachment');
+    });
+  };
+
+  const renderAttachment = (attachment, index) => {
+    if (!attachment?.url) return null;
+
+    return (
+      <TouchableOpacity 
+        key={index} 
+        style={styles.attachmentItem}
+        onPress={() => handleAttachmentPress(attachment.url)}
+      >
+        {attachment.type === 'image' ? (
+          <Image 
+            source={{ uri: attachment.url }} 
+            style={styles.attachmentImage}
+            onError={() => console.log('Image load error')}
+          />
+        ) : (
+          <View style={styles.documentAttachment}>
+            <Ionicons name="document-outline" size={40} color="#315342" />
+          </View>
+        )}
+        <Text style={styles.attachmentTypeText}>
+          {attachment.type === 'image' ? 'Image' : 'Document'}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -63,92 +123,119 @@ const ViewCheckup = ({ record, animals, statusOptions, onClose, onEdit }) => {
         </View>
       </View>
 
-      <View style={styles.formGroup}>
-        <Text style={styles.formLabel}>Animal</Text>
-        <View style={styles.viewField}>
-          <Text>{getAnimalName()}</Text>
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.formLabel}>Checkup Date</Text>
-        <View style={styles.viewField}>
-          <Text>{formatDate(record.date)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.formLabel}>Description</Text>
-        <View style={[styles.viewField, styles.viewFieldMultiline]}>
-          <Text>{record.description}</Text>
-        </View>
-      </View>
-
-      {record.diagnosis && (
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Diagnosis</Text>
-          <View style={[styles.viewField, styles.viewFieldMultiline]}>
-            <Text>{record.diagnosis}</Text>
+      <View style={styles.animalHeader}>
+        {getAnimalImage() ? (
+          <Image 
+            source={{ uri: getAnimalImage() }} 
+            style={styles.animalImageLarge}
+          />
+        ) : (
+          <View style={styles.animalImagePlaceholder}>
+            <Ionicons name="paw-outline" size={40} color="#315342" />
+          </View>
+        )}
+        <View style={styles.animalInfo}>
+          <Text style={styles.animalNameLarge}>{getAnimalName()}</Text>
+          <View style={[styles.statusBadgeLarge, { backgroundColor: getStatusColor(record.status) }]}>
+            <Text style={styles.statusTextLarge}>{formatStatus(record.status)}</Text>
           </View>
         </View>
-      )}
+      </View>
 
-      {record.treatment && (
+      {/* Checkup Details */}
+      <View style={styles.detailsContainer}>
         <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Treatment</Text>
-          <View style={[styles.viewField, styles.viewFieldMultiline]}>
-            <Text>{record.treatment}</Text>
-          </View>
-        </View>
-      )}
-
-      {record.weight && (
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Weight</Text>
+          <Text style={styles.formLabel}>Checkup Date</Text>
           <View style={styles.viewField}>
-            <Text>{record.weight} kg</Text>
+            <Text>{formatDate(record.date)}</Text>
           </View>
         </View>
-      )}
 
-      {record.temperature && (
         <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Temperature</Text>
-          <View style={styles.viewField}>
-            <Text>{record.temperature} °C</Text>
-          </View>
-        </View>
-      )}
-
-      {record.followUpDate && (
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Follow-up Date</Text>
-          <View style={styles.viewField}>
-            <Text>{formatDate(record.followUpDate)}</Text>
-          </View>
-        </View>
-      )}
-
-      <View style={styles.formGroup}>
-        <Text style={styles.formLabel}>Status</Text>
-        <View style={styles.viewField}>
-          <Text>{formatStatus(record.status)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.formLabel}>Critical Case</Text>
-        <View style={styles.viewField}>
-          <Text>{record.isCritical ? 'Yes' : 'No'}</Text>
-        </View>
-      </View>
-
-      {record.notes && (
-        <View style={styles.formGroup}>
-          <Text style={styles.formLabel}>Additional Notes</Text>
+          <Text style={styles.formLabel}>Description</Text>
           <View style={[styles.viewField, styles.viewFieldMultiline]}>
-            <Text>{record.notes}</Text>
+            <Text>{record.description}</Text>
           </View>
+        </View>
+
+        {record.diagnosis && (
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Diagnosis</Text>
+            <View style={[styles.viewField, styles.viewFieldMultiline]}>
+              <Text>{record.diagnosis}</Text>
+            </View>
+          </View>
+        )}
+
+        {record.treatment && (
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Treatment</Text>
+            <View style={[styles.viewField, styles.viewFieldMultiline]}>
+              <Text>{record.treatment}</Text>
+            </View>
+          </View>
+        )}
+
+        {record.weight && (
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Weight</Text>
+            <View style={styles.viewField}>
+              <Text>{record.weight} kg</Text>
+            </View>
+          </View>
+        )}
+
+        {record.temperature && (
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Temperature</Text>
+            <View style={styles.viewField}>
+              <Text>{record.temperature} °C</Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.formGroup}>
+          <Text style={styles.formLabel}>Critical Case</Text>
+          <View style={styles.viewField}>
+            <Text>{record.isCritical ? 'Yes' : 'No'}</Text>
+          </View>
+        </View>
+
+        {record.notes && (
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Additional Notes</Text>
+            <View style={[styles.viewField, styles.viewFieldMultiline]}>
+              <Text>{record.notes}</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Attachments Gallery */}
+      {record.attachments && record.attachments.length > 0 && (
+        <View style={styles.attachmentsSection}>
+          <Text style={styles.sectionTitle}>Attachments</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.attachmentsContainer}
+          >
+            {record.attachments.map((attachment, index) => (
+              <TouchableOpacity 
+                key={index} 
+                style={styles.attachmentItem}
+                onPress={() => Linking.openURL(attachment.url)}
+              >
+                <Image 
+                  source={{ uri: attachment.url }} 
+                  style={styles.attachmentImage}
+                />
+                <Text style={styles.attachmentTypeText}>
+                  {attachment.type === 'image' ? 'Image' : 'Document'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
     </ScrollView>
@@ -164,6 +251,8 @@ const MedicalCheckups = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [animals, setAnimals] = useState([]);
   const [vetId, setVetId] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   // Modal states
   const [showAnimalPicker, setShowAnimalPicker] = useState(false);
@@ -202,21 +291,46 @@ const MedicalCheckups = ({ navigation }) => {
     status: 'active'
   });
 
-  // Status options
+  // Status options - Updated
   const statusOptions = [
     { value: 'active', label: 'Active' },
-    { value: 'resolved', label: 'Resolved' },
-    { value: 'follow_up', label: 'Follow Up' }
+    { value: 'fully_healed', label: 'Fully Healed' },
+    { value: 'in_recovery', label: 'In Recovery' },
+    { value: 'deceased', label: 'Deceased' }
   ];
 
-  // Get status color
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'active': return '#FFA500';
-      case 'resolved': return '#4CAF50';
-      case 'follow_up': return '#2196F3';
-      default: return '#666';
+  // Image handling functions
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        // Compress the image
+        const compressedImage = await manipulateAsync(
+          result.assets[0].uri,
+          [{ resize: { width: 800 } }],
+          { compress: 0.7, format: SaveFormat.JPEG }
+        );
+        
+        setAttachments(prev => [...prev, {
+          uri: compressedImage.uri,
+          name: compressedImage.uri.split('/').pop(),
+          type: 'image/jpeg'
+        }]);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      showToast('error', 'Error', 'Failed to pick image');
     }
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   // Open drawer function
@@ -226,148 +340,109 @@ const MedicalCheckups = ({ navigation }) => {
 
   // Fetch vet ID
   const fetchVetId = async () => {
-  try {
-    const token = await AsyncStorage.getItem('userToken');
-    const response = await axios.get(`${API_BASE_URL}/user/profile`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    const fetchedVetId = response.data.user?.id || response.data.user?._id;
-    
-    if (fetchedVetId && fetchedVetId !== 'null' && fetchedVetId !== null) {
-      console.log('Setting vetId:', fetchedVetId);
-      setVetId(fetchedVetId);
-    } else {
-      console.error('Invalid vetId received:', fetchedVetId);
-      setVetId(null);
-    }
-  } catch (error) {
-    console.error('Error fetching vet ID:', error);
-    setVetId(null);
-  }
-};
-
-  // Fetch animals assigned to the vet with needs_attention status
-// Fix the fetchAssignedAnimals function to handle null vetId
-const fetchAssignedAnimals = async () => {
-  try {
-    // Don't make the request if vetId is null or undefined
-    if (!vetId) {
-      console.log('No vetId available, skipping assigned animals fetch');
-      return [];
-    }
-
-    const token = await AsyncStorage.getItem('userToken');
-    const response = await axios.get(`${API_BASE_URL}/user/vet/${vetId}/assigned-animals`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    // Filter animals that need medical attention (status: needs_attention)
-    const animalsNeedingAttention = response.data.animals.filter(animal => 
-      animal.status === 'needs_attention'
-    );
-    
-    // Process the data similar to processedPatients in the dashboard
-    const processedAnimals = animalsNeedingAttention.map(animal => ({
-      ...animal,
-      checkupReason: animal.assignmentReason || 'Medical attention required',
-      lastCheckup: animal.lastCheckup || null,
-      urgencyLevel: 'high', // Since they need attention
-      assignedDate: animal.assignedAt
-    }));
-    
-    return processedAnimals;
-  } catch (error) {
-    console.error('Error fetching assigned animals:', error);
-    return [];
-  }
-};
-
-// Fix the fetchCheckups function to wait for vetId
-const fetchCheckups = async () => {
-  try {
-    setLoading(true);
-    
-    // Don't proceed if vetId is not available
-    if (!vetId) {
-      console.log('No vetId available, cannot fetch checkups');
-      setCheckups([]);
-      return;
-    }
-
-    const token = await AsyncStorage.getItem('userToken');
-    
-    // First get the assigned animals that need attention (processed like in dashboard)
-    const assignedAnimals = await fetchAssignedAnimals();
-    
-    if (assignedAnimals.length === 0) {
-      console.log('No assigned animals found');
-      setCheckups([]);
-      return;
-    }
-    
-    // Then get checkups for these animals
-    const checkupPromises = assignedAnimals.map(animal => 
-      axios.get(`${API_BASE_URL}/medical-records?recordType=checkup&animal=${animal._id}&populate=animal,veterinarian`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-    );
-    
-    const checkupResponses = await Promise.all(checkupPromises);
-    
-    // Combine all checkups and add the processed animal data
-    const allCheckups = checkupResponses.flatMap((response, index) => {
-      return response.data.map(checkup => ({
-        ...checkup,
-        animal: assignedAnimals[index], // Use the processed animal data
-        checkupReason: assignedAnimals[index].checkupReason,
-        urgencyLevel: assignedAnimals[index].urgencyLevel,
-        assignedDate: assignedAnimals[index].assignedDate,
-        lastCheckup: assignedAnimals[index].lastCheckup
-      }));
-    });
-    
-    setCheckups(allCheckups);
-  } catch (error) {
-    console.error('Error fetching checkups:', error);
-    showToast('error', 'Error', 'Failed to fetch medical checkups');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
-
-// Fix the useEffect to properly wait for vetId before fetching
-useEffect(() => {
-  const loadData = async () => {
     try {
-      // First fetch vetId
-      await fetchVetId();
-      // Then fetch animals (this doesn't depend on vetId)
-      await fetchAnimals();
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/user/profile`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const fetchedVetId = response.data.user?.id || response.data.user?._id;
+      
+      if (fetchedVetId && fetchedVetId !== 'null' && fetchedVetId !== null) {
+        console.log('Setting vetId:', fetchedVetId);
+        setVetId(fetchedVetId);
+      } else {
+        console.error('Invalid vetId received:', fetchedVetId);
+        setVetId(null);
+      }
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      console.error('Error fetching vet ID:', error);
+      setVetId(null);
     }
   };
 
-  const unsubscribe = navigation.addListener('focus', loadData);
-  return unsubscribe;
-}, [navigation]);
+  // Fetch animals assigned to the vet with needs_attention status
+  const fetchAssignedAnimals = async () => {
+    try {
+      if (!vetId) {
+        console.log('No vetId available, skipping assigned animals fetch');
+        return [];
+      }
 
-// Add a separate useEffect that runs when vetId changes
-useEffect(() => {
-  if (vetId) {
-    fetchCheckups();
-  }
-}, [vetId]);
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/user/vet/${vetId}/assigned-animals`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const animalsNeedingAttention = response.data.animals.filter(animal => 
+        animal.status === 'needs_attention'
+      );
+      
+      const processedAnimals = animalsNeedingAttention.map(animal => ({
+        ...animal,
+        checkupReason: animal.assignmentReason || 'Medical attention required',
+        lastCheckup: animal.lastCheckup || null,
+        urgencyLevel: 'high',
+        assignedDate: animal.assignedAt
+      }));
+      
+      return processedAnimals;
+    } catch (error) {
+      console.error('Error fetching assigned animals:', error);
+      return [];
+    }
+  };
 
-// Also fix the fetchVetId function to ensure it properly sets the vetId
+  // Fetch checkups
+  const fetchCheckups = async () => {
+    try {
+      setLoading(true);
+      
+      if (!vetId) {
+        console.log('No vetId available, cannot fetch checkups');
+        setCheckups([]);
+        return;
+      }
 
+      const token = await AsyncStorage.getItem('userToken');
+      const assignedAnimals = await fetchAssignedAnimals();
+      
+      if (assignedAnimals.length === 0) {
+        console.log('No assigned animals found');
+        setCheckups([]);
+        return;
+      }
+      
+      const checkupPromises = assignedAnimals.map(animal => 
+        axios.get(`${API_BASE_URL}/medical-records?recordType=checkup&animal=${animal._id}&populate=animal,veterinarian`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      );
+      
+      const checkupResponses = await Promise.all(checkupPromises);
+      
+      const allCheckups = checkupResponses.flatMap((response, index) => {
+        return response.data.map(checkup => ({
+          ...checkup,
+          animal: assignedAnimals[index],
+          checkupReason: assignedAnimals[index].checkupReason,
+          urgencyLevel: assignedAnimals[index].urgencyLevel,
+          assignedDate: assignedAnimals[index].assignedDate,
+          lastCheckup: assignedAnimals[index].lastCheckup
+        }));
+      });
+      
+      setCheckups(allCheckups);
+    } catch (error) {
+      console.error('Error fetching checkups:', error);
+      showToast('error', 'Error', 'Failed to fetch medical checkups');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  // Fetch checkups for animals with assignmentReason
- 
-
-  // Fetch all animals (for the animal picker)
+  // Fetch all animals
   const fetchAnimals = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -446,6 +521,7 @@ useEffect(() => {
       isCritical: record.isCritical || false,
       status: record.status || 'active'
     });
+    setAttachments([]);
     setShowViewModal(false);
     setShowRecordModal(true);
   };
@@ -467,6 +543,7 @@ useEffect(() => {
       isCritical: false,
       status: 'active'
     });
+    setAttachments([]);
     setShowRecordModal(true);
   };
 
@@ -479,34 +556,65 @@ useEffect(() => {
 
     try {
       setLoading(true);
+      setUploading(true);
       const token = await AsyncStorage.getItem('userToken');
       
-      const dataToSend = {
-        ...formData,
-        animal: formData.animal,
-        date: formData.date.toISOString(),
-        followUpDate: formData.followUpDate ? formData.followUpDate.toISOString() : null
-      };
+      // Create FormData
+      const formDataToSend = new FormData();
+      
+      // Add regular fields
+      formDataToSend.append('animal', formData.animal);
+      formDataToSend.append('recordType', formData.recordType);
+      formDataToSend.append('date', formData.date.toISOString());
+      formDataToSend.append('description', formData.description);
+      formDataToSend.append('diagnosis', formData.diagnosis || '');
+      formDataToSend.append('treatment', formData.treatment || '');
+      formDataToSend.append('weight', formData.weight || '');
+      formDataToSend.append('temperature', formData.temperature || '');
+      formDataToSend.append('notes', formData.notes || '');
+      formDataToSend.append('isCritical', formData.isCritical);
+      formDataToSend.append('status', formData.status);
+      
+      if (formData.followUpDate) {
+        formDataToSend.append('followUpDate', formData.followUpDate.toISOString());
+      }
+      
+      // Add attachments
+      attachments.forEach((file) => {
+        formDataToSend.append('attachments', {
+          uri: file.uri,
+          name: file.name || `image-${Date.now()}.jpg`,
+          type: file.type || 'image/jpeg'
+        });
+      });
 
       if (currentRecord) {
-        await axios.put(`${API_BASE_URL}/medical-records/${currentRecord._id}`, dataToSend, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        await axios.put(`${API_BASE_URL}/medical-records/${currentRecord._id}`, formDataToSend, {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
         });
         showToast('success', 'Success', 'Checkup updated');
       } else {
-        await axios.post(`${API_BASE_URL}/medical-records`, dataToSend, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        await axios.post(`${API_BASE_URL}/medical-records`, formDataToSend, {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
         });
         showToast('success', 'Success', 'Checkup created');
       }
       
       setShowRecordModal(false);
+      setAttachments([]);
       fetchCheckups();
     } catch (error) {
       console.error('Error saving checkup:', error);
       showToast('error', 'Error', `Failed to ${currentRecord ? 'update' : 'create'} checkup`);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -565,14 +673,24 @@ useEffect(() => {
   // Load data on focus
   useEffect(() => {
     const loadData = async () => {
-      await fetchVetId();
-      await fetchAnimals();
-      await fetchCheckups();
+      try {
+        await fetchVetId();
+        await fetchAnimals();
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      }
     };
 
     const unsubscribe = navigation.addListener('focus', loadData);
     return unsubscribe;
-  }, [navigation, vetId]);
+  }, [navigation]);
+
+  // Add a separate useEffect that runs when vetId changes
+  useEffect(() => {
+    if (vetId) {
+      fetchCheckups();
+    }
+  }, [vetId]);
 
   // Render checkup item
   const renderCheckupItem = ({ item }) => {
@@ -608,12 +726,7 @@ useEffect(() => {
             >
               <Ionicons name="eye-outline" size={20} color="#315342" />
             </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={() => deleteCheckup(item._id)}
-              style={styles.deleteButton}
-            >
-              <Ionicons name="trash-outline" size={20} color="#ff4444" />
-            </TouchableOpacity>
+            {/* Delete button commented out as in second code */}
           </View>
         </View>
       </TouchableOpacity>
@@ -990,25 +1103,6 @@ useEffect(() => {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Follow-up Date</Text>
-              <TouchableOpacity 
-                style={styles.formInput}
-                onPress={() => {
-                  setDatePickerMode('followup');
-                  setShowDatePicker(true);
-                }}
-              >
-                <Text>
-                  {formData.followUpDate ? 
-                    formatDate(formData.followUpDate) : 
-                    'Select follow-up date'
-                  }
-                </Text>
-                <Ionicons name="calendar" size={20} color="#315342" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Status</Text>
               <TouchableOpacity 
                 style={styles.formInput}
@@ -1049,6 +1143,40 @@ useEffect(() => {
               />
             </View>
 
+            {/* Attachments Section */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Attachments</Text>
+              <TouchableOpacity 
+                style={styles.attachmentButton}
+                onPress={pickImage}
+                disabled={uploading}
+              >
+                <Text style={styles.attachmentButtonText}>
+                  {uploading ? 'Uploading...' : 'Add Image'}
+                </Text>
+                <Ionicons name="cloud-upload-outline" size={20} color="#315342" />
+              </TouchableOpacity>
+
+              {attachments.length > 0 && (
+                <View style={styles.attachmentsContainer}>
+                  {attachments.map((file, index) => (
+                    <View key={index} style={styles.attachmentItem}>
+                      <Image 
+                        source={{ uri: file.uri }} 
+                        style={styles.attachmentImage}
+                      />
+                      <TouchableOpacity 
+                        style={styles.removeAttachmentButton}
+                        onPress={() => removeAttachment(index)}
+                      >
+                        <Ionicons name="close" size={16} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
             <TouchableOpacity 
               style={styles.submitButton}
               onPress={handleSubmit}
@@ -1085,6 +1213,8 @@ useEffect(() => {
     </DrawerLayoutAndroid>
   );
 };
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -1665,6 +1795,292 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  attachmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(164, 217, 171, 0.2)',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a4d9ab',
+    marginBottom: 10,
+  },
+  attachmentButtonText: {
+    color: '#315342',
+    marginRight: 8,
+    fontWeight: '600',
+  },
+  attachmentsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  attachmentItem: {
+    width: 80,
+    height: 80,
+    marginRight: 10,
+    marginBottom: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  attachmentImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeAttachmentButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(255, 0, 0, 0.7)',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+   recordModalContainer: {
+    padding: 20,
+    paddingBottom: 40,
+    backgroundColor: '#f8f9fa',
+  },
+  recordModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 2,
+    borderBottomColor: '#a4d9ab',
+  },
+  recordModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#315342',
+    letterSpacing: 0.5,
+  },
+  viewModeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editButton: {
+    marginRight: 15,
+  },
+  animalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 25,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  animalImageLarge: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginRight: 20,
+    borderWidth: 3,
+    borderColor: '#a4d9ab',
+  },
+  animalImagePlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginRight: 20,
+    borderWidth: 3,
+    borderColor: '#a4d9ab',
+    backgroundColor: '#e9f5eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  animalInfo: {
+    flex: 1,
+  },
+  animalNameLarge: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#315342',
+    marginBottom: 10,
+  },
+  statusBadgeLarge: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    elevation: 2,
+  },
+  statusTextLarge: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    textTransform: 'uppercase',
+  },
+  detailsContainer: {
+    marginBottom: 20,
+  },
+  formGroup: {
+    marginBottom: 18,
+  },
+  formLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#315342',
+    marginBottom: 8,
+  },
+  viewField: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    elevation: 1,
+  },
+  viewFieldMultiline: {
+    minHeight: 80,
+  },
+  attachmentsSection: {
+    marginTop: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#315342',
+    marginBottom: 12,
+  },
+  attachmentsContainer: {
+    paddingVertical: 5,
+  },
+  attachmentItem: {
+    width: 140,
+    marginRight: 12,
+    alignItems: 'center',
+  },
+  attachmentImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 10,
+    marginBottom: 6,
+    backgroundColor: '#f0f0f0',
+  },
+  attachmentTypeText: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+  },
+   animalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+  },
+  animalImageLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 15,
+  },
+  animalImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#e9ecef',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  animalInfo: {
+    flex: 1,
+  },
+  animalNameLarge: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#315342',
+    marginBottom: 5,
+  },
+  statusBadgeLarge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    alignSelf: 'flex-start',
+  },
+  statusTextLarge: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  detailsContainer: {
+    marginBottom: 20,
+  },
+  attachmentsSection: {
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#315342',
+    marginBottom: 10,
+  },
+  attachmentsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 5,
+  },
+  attachmentItem: {
+    marginRight: 10,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  attachmentImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    resizeMode: 'cover',
+  },
+  attachmentTypeText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  documentAttachment: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  attachmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#315342',
+    marginBottom: 10,
+  },
+  attachmentButtonText: {
+    color: '#315342',
+    marginRight: 8,
+    fontWeight: '500',
+  },
+  removeAttachmentButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#ff4444',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

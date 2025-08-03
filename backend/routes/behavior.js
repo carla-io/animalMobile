@@ -4,6 +4,81 @@ const router = express.Router();
 const AnimalBehavior = require('../models/AnimalBehavior');
 const Animal = require('../models/Animals');
 const User = require('../models/User');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
+
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Multer memory storage for direct stream to Cloudinary
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 1 * 1024 ** 3 }, // 1GB 
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'video/mp4') cb(null, true);
+    else cb(new Error('Only MP4 video files are allowed'));
+  }
+});
+
+
+
+router.post('/add', upload.single('proofVideo'), async (req, res) => {
+  try {
+    console.log('req.body:', req.body);
+    const { animalId, eating, movement, mood, notes, recordedBy } = req.body;
+    let proofVideoUrl = null; // ⚠️ Removed default image
+
+    // If a video is uploaded, stream it to Cloudinary in folder
+    if (req.file) {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const cld_upload_stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'video',
+            folder: 'animal_behavior_proofs' // ✅ Organized folder
+          },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(cld_upload_stream);
+      });
+
+      proofVideoUrl = uploadResult.secure_url;
+    }
+
+    // Create behavior log entry
+    const newLog = new AnimalBehavior({
+      animalId,
+      eating,
+      movement,
+      mood,
+      notes,
+      recordedBy,
+      proofVideo: proofVideoUrl // ✅ Will be null if no video
+    });
+
+    await newLog.save();
+
+    // Optional: Flag animal status if behavior is concerning
+    if (eating === 'None' || movement === 'Limping' || mood === 'Aggressive') {
+      await Animal.findByIdAndUpdate(animalId, { status: 'needs_attention' });
+      console.log(`⚠️ Animal ${animalId} flagged for attention.`);
+    }
+
+    res.status(201).json({ message: 'Behavior log saved successfully.' });
+  } catch (err) {
+  console.error('Error saving behavior log:', err);  // log full error object, not just message
+  res.status(500).json({ error: err.message || 'Error saving behavior log.' });
+}
+});
+
 
 //add behavior log
 // router.post('/add', async (req, res) => {
@@ -17,35 +92,7 @@ const User = require('../models/User');
 // });
 
 
-router.post('/add', async (req, res) => {
-  try {
-    const newLog = new AnimalBehavior(req.body);
-    await newLog.save();
 
-    const { animalId, eating, movement, mood } = req.body;
-
-    // Check for critical behavior
-    const needsAttention = (
-      eating === 'None' ||
-      movement === 'Limping' ||
-      mood === 'Aggressive'
-    );
-
-    if (needsAttention) {
-      await Animal.findByIdAndUpdate(animalId, { status: 'needs_attention' });
-
-      // Optional: log an alert or send email to admin
-      console.log(`⚠️ Animal ${animalId} flagged for attention.`);
-
-      // You can insert a notification to DB or trigger admin action here
-    }
-
-    res.status(201).json({ message: 'Behavior log saved successfully.' });
-  } catch (err) {
-    console.error('Error saving behavior log:', err);
-    res.status(500).json({ error: 'Error saving behavior log.' });
-  }
-});
 ////get behavior of sinle  animal
 // exports.getBehaviorsByAnimalId = async (req, res) => {
 //   const { animalId } = req.params;
